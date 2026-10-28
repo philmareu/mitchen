@@ -1,0 +1,10 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    paths:
+        - app/
+        - database/factories/
+    level: 6
+    # Models declare casts in a casts() method; read its body so cast types are known.
+    parseModelCastsMethod: true

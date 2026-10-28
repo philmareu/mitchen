@@ -1,0 +1,205 @@
+# Mitchen
+
+A kitchen assistant: ingredients, what's on hand, and (to come) recipes, equipment, meal planning and AI help on top. Built as an MVP to grow feature by feature and kept presentable as a possible open-source project; the roadmap is in `README.md`.
+
+## Stack
+
+- Laravel 13 on PHP 8.5, Filament 5 panel served from `/` (panel id `admin`), Livewire 4, laravel/ai 1.x with Anthropic, Pest 5, Pint, Larastan level 6.
+- Verify Filament APIs against `vendor/filament/*/docs` and the AI SDK against `vendor/laravel/ai` and `.claude/skills/ai-sdk-development` rather than memory.
+- One kitchen per install: no tenancy, every user sees the same data (`User::canAccessPanel()` returns true).
+
+## Domain
+
+- `Ingredient` is the catalog entry recipes will point at. `is_core` = a staple you always keep; non-core ingredients are one-offs for a single recipe.
+- `InventoryItem` = some of an ingredient in one `StorageLocation`. An ingredient can have several (fridge + freezer).
+- A quantity is stored in three columns and is **either** `amount` (+ optional `unit`) **or** `stock_level` (full/half/low/out), never both. Always read and write it through the `quantity` attribute (`App\Support\Quantity`), which also accepts typed text: `$item->quantity = 'half a jar'`. An amount of zero becomes `StockLevel::Out`.
+- `App\Support\QuantityParser` reads free text ("2 lb", "1½ cups", "a couple cans", "half a dozen", "almost out"). Unknown units throw `UnreadableQuantity` rather than being stored; add spellings in `Unit::aliases()` and level phrases in `StockLevel::phrases()`. `Quantity::format()` round-trips through the parser.
+- `Unit::convert()` converts within weights and within (US) volumes; containers and plain counts only match themselves. `Quantity::plus()` adds in the first quantity's unit ("1 lb" + "8 oz" = "1½ lb"), `Quantity::amountIn()` converts.
+- Restock point: a core ingredient's `restock_point` (three `restock_*` columns, read and written like `quantity`) is when it goes on the restock list. `Quantity::isReachedBy()` decides: a level point is reached when no item is above that level (measured items count as above it); an amount point when items in a convertible unit add up to no more than it and nothing else usable is on hand. No point = the default "low or out". `IngredientBuilder::needsRestock()` evaluates this in PHP and returns a `whereKey()` scope, because cross-unit sums aren't portable SQL.
+- `UseUpInventoryItem`: core → marked out (stays, lands on the restock list); one-off → deleted. `RestockIngredient` replaces a low/out item in the same location, else adds to one in a compatible unit (`Quantity::plus()`), else creates one; it clears `out` placeholders elsewhere.
+- `ShoppingListItem`: name, free-text quantity, category (the aisle), `bought_at` (ticked off = in the cart). A `saving` hook links it to the catalog ingredient of the same name whenever the name changes, taking the catalog spelling and category; anything else (paper towels) stays free text. `AddToShoppingList` keeps one unbought entry per name and `restockList()` brings in restock-list ingredients not on the list yet (`notOnShoppingList()`: ticked entries count as on the list). Adding is always explicit (button, row action, "need" in Quick update); nothing is added automatically.
+- An entry leaves the list (is deleted) once it's in the inventory, so nothing is counted twice: `PutAwayShopping` ("Put away what you got", `Filament/Actions/PutAwayAction`) proposes a bought change per ticked entry (location from the low/out item, else where it's kept, else `IngredientCategory::usualLocation()`; unlinked entries in the "Other" aisle get none and are just cleared), runs the confirmed ones through `ApplyKitchenUpdate`, then deletes every ticked entry it showed. "Restocked" on the dashboard deletes the ingredient's entries. `ApplyKitchenUpdate` deletes the entries the cook ticked in the review plus ticked entries whose ingredient the update bought (ticked in the store, then a receipt photo).
+
+- Purchase history: `Store` (name, unique; matched case-insensitively with `StoreBuilder::named()`), `Purchase` (store nullable, `purchased_on`, `total`), `PurchaseItem` (name linked to the catalog by a `saving` hook like shopping list entries, `as_written` = receipt line or note words, a quantity in the same three columns as inventory, `price` = what the whole line cost). `RecordPurchase` turns the bought changes of an update into a purchase, adding an unknown store; `Purchase::addUpMissingTotal()` fills a missing total from the known prices. `ApplyKitchenUpdate` records one whenever an update buys something (Quick update and Put away; dashboard "Restocked" doesn't). `PurchaseItem::formattedPrice()` gives the unit price ("$3.49/lb", "$0.33 each"); `Ingredient::lastPaid()` (latest priced line) shows on the shopping list and ingredients table. Money is USD, Filament's and `Number`'s default.
+- `DatabaseSeeder` keeps model events on (Laravel's default `WithoutModelEvents` is removed) so the name-linking hooks run when seeding.
+
+## AI: quick update, receipts and stock-takes
+
+- `App\Filament\Actions\QuickUpdateAction` (Dashboard, Inventory and Shopping list headers) is a two-step wizard: a plain-language note and/or up to 4 photos (resized in the browser to 2576 px, the most current Claude models read; never stored), then a review step: where, when and how much the shop was (store, date, total; shown when something is bought), a table repeater of proposed changes with a price column for bought rows, a checkbox list of shopping list entries to take off the list (pre-ticked with what was bought), and, after a stock-take, an unticked checkbox list of items the photos should have shown but didn't. Nothing is written until the cook confirms.
+- `ReadKitchenUpdate` prompts `Ai/Agents/KitchenUpdateReader` (structured output, `#[UseCheapestModel]` → `ANTHROPIC_FAST_MODEL`), or `PhotoReader` when there are photos. `PhotoReader` extends it with rules for receipts (bought) and storage photos (a stock-take of "set" changes, plus `not_seen` item ids), and runs on the default model (`ANTHROPIC_MODEL`): PHP attributes aren't inherited, so it redeclares `#[MaxTokens]`/`#[Timeout]` and never picks up `#[UseCheapestModel]`. Both get the note, the whole catalog (core flag, restock point, items on hand), the unbought shopping list and the saved store names, then distrust the answer: names matched case-insensitively to the catalog and stores, item and list ids that don't exist or don't fit dropped, prices that aren't non-negative numbers (or are on anything but a bought change) and future purchase dates dropped, unknown enums defaulted, malformed lists treated as empty. `bought_from_list` also gains any list entry whose ingredient is bought in the update; `not_seen` drops items already out or changed in the update. Result is a `KitchenUpdate`: `ProposedChange`s (`ChangeKind` bought / set / used_up / need), not-understood text, `boughtFromList`, `notSeen` and `PurchaseDetails` (store, date, total).
+- `ApplyKitchenUpdate` runs in one transaction: need → `AddToShoppingList` (no ingredient is created); unknown ingredients are otherwise created as one-offs; bought → `RestockIngredient`; set → the named item (moved if the cook changed where), else the one in the same place, else a new one there, never an item somewhere else (a fridge photo says nothing about the pantry jar); used up (or set to "out") → `UseUpInventoryItem`; then bought changes go to `RecordPurchase`, and the confirmed list entries, and ticked ones for anything bought, are deleted. Not-seen items the cook ticks become used-up changes (`ProposedChange::useUp()`). Quantities go through `Quantity::parse()`, so an unreadable one fails the whole save and the review form shows the parser's error.
+- The action is disabled without a key (`KitchenUpdateReader::isConfigured()`); AI failures are reported and shown as a notification, keeping the cook on step 1. After saving it dispatches `inventory-updated`, which the dashboard widgets listen for.
+- Reading runs inside the Livewire request (a photo takes 5–20 s on Sonnet, longer on Opus). Behind PHP-FPM, raise `max_execution_time` past `PhotoReader`'s 180 s timeout.
+
+## AI usage
+
+- The SDK reports tokens per response but neither stores nor prices them. `App\Listeners\RecordAiUsage` (auto-discovered, bound as a singleton in `AppServiceProvider` so it can time calls) writes an `AiCall` for every `AgentPrompted` and `AgentFailed`, timed from `PromptingAgent`. It runs inside `rescue()`: bookkeeping never breaks the feature. Calls made through any agent, fakes included, are recorded.
+- `App\Support\AiPricing` prices usage from `config('ai.pricing')` (USD per million tokens, 5-minute cache-write rate, optional `long_context` tier). Unknown models get a null cost ("No price"). Update the rates when Anthropic's change; the cost is stored at call time.
+- `AiCallResource` (`/ai-usage`) is read-only: stats header (`AiUsageOverview`) and a filterable log with a cost total. Image tokens are billed as ordinary input tokens, so receipts need no special handling.
+- Query scopes live in custom builders (`app/Models/Builders`, wired with `#[UseEloquentBuilder]`) so Filament closures can type-hint `IngredientBuilder`/`InventoryItemBuilder` and Larastan follows them.
+
+## Rules
+
+- Dev database on this machine: MySQL `sous_chef` (from the project's old name, Sous Chef; `.env.example` uses `mitchen` for fresh installs) at 127.0.0.1:3306 (root, no password). Tests use in-memory SQLite, so stay driver-neutral.
+- `ANTHROPIC_API_KEY` lives only in `.env`. Models are set in `config/ai.php`: `ANTHROPIC_MODEL` (default `claude-opus-5-5`) and `ANTHROPIC_FAST_MODEL` (default `claude-haiku-5-5`, used by quick update).
+- Business logic goes in `app/Actions` (and pure helpers in `app/Support`), not in Filament classes.
+- Serve with `php artisan serve` and no `--port`; read the URL from its output. Stop servers you started. To click around without touching the dev data, migrate and seed a scratch SQLite file and serve with `DB_CONNECTION=sqlite DB_DATABASE=<file> php artisan serve --no-reload` (without `--no-reload` the server drops env vars so `.env` wins).
+- No custom Filament theme: Tailwind classes in Filament schemas aren't compiled.
+
+## Tests
+
+- `php artisan test --compact`; `vendor/bin/pint --dirty --format agent` and `vendor/bin/phpstan analyse` before committing.
+- Filament tests use `livewire(...)` with `TestAction::make('name')->table($record)` for row actions; `actingAsCook()` and `readerChange()` (one raw agent change) are in `tests/Pest.php`.
+- Fake the agents with `KitchenUpdateReader::fake([[...]])` / `PhotoReader::fake(...)`; quick update tests set `ai.providers.anthropic.key` so the action is enabled. To fake token usage, pass a `Laravel\Ai\Responses\StructuredTextResponse` with a `TextUsage` and `Meta`. `fakeReceiptPhoto()` is a real 1×1 JPEG (use it for shelf photos too) (there's no GD for `UploadedFile::fake()->image()`). Action modal content isn't in Livewire test HTML: assert schema state, not `assertSee`. To edit repeater rows in a test, pass `fillForm()` a closure: a dotted key such as `changes.0.quantity` replaces the whole `changes` array. Once photos are uploaded, fill other fields with a plain array instead (a closure would re-fill the uploaded files and fail). Tick a table checkbox column with `->call('updateTableColumnState', 'bought', (string) $id, true)`.
+- `php artisan migrate:fresh --seed` loads `DemoKitchenSeeder` (login `test@example.com` / `password`).
+
+<laravel-boost-guidelines>
+=== foundation rules ===
+
+# Laravel Boost Guidelines
+
+## Foundational Context
+
+This application is a Laravel application running on PHP 8.5. Always use the APIs that match the installed major version of each package — do not assume a version.
+
+Before relying on a package's API, confirm its installed version:
+- PHP packages: run `composer show --direct` to list direct dependencies with versions, or `composer show <vendor/package>` for a single package.
+- JS packages: check `package.json` for the installed versions.
+
+## Skills Activation
+
+This project has domain-specific skills available in `**/skills/**`. You MUST activate the relevant skill whenever you work in that domain—don't wait until you're stuck.
+
+## Conventions
+
+- You must follow all existing code conventions used in this application. When creating or editing a file, check sibling files for the correct structure, approach, and naming.
+- Use descriptive names for variables and methods. For example, `isRegisteredForDiscounts`, not `discount()`.
+- Check for existing components to reuse before writing a new one.
+
+## Verification Scripts
+
+- Do not create verification scripts or tinker when tests cover that functionality and prove they work. Unit and feature tests are more important.
+
+## Application Structure & Architecture
+
+- Stick to existing directory structure; don't create new base folders without approval.
+- Do not change the application's dependencies without approval.
+
+## Frontend Bundling
+
+- If a frontend change doesn't show in the UI or you get a "Unable to locate file in Vite manifest" error, run `npm run build` or ask the user to run `npm run dev` or `composer run dev`.
+
+## Documentation Files
+
+- You must only create documentation files if explicitly requested by the user.
+
+=== boost rules ===
+
+# Laravel Boost
+
+## Tools
+
+- Laravel Boost is an MCP server with tools designed specifically for this application. Prefer Boost tools over manual alternatives like shell commands or file reads.
+- Use `database-query` to run read-only queries against the database instead of writing raw SQL in tinker.
+- Use `database-schema` to inspect table structure before writing migrations or models.
+- Use `get-absolute-url` to resolve the correct scheme, domain, and port for project URLs. Always use this before sharing a URL with the user.
+- Use `browser-logs` to read browser logs, errors, and exceptions. Only recent logs are useful, ignore old entries.
+
+## Searching Documentation (IMPORTANT)
+
+- Use `search-docs` before changes that depend on Laravel ecosystem APIs, behavior, configuration, or version-specific syntax. Skip it for copy-only edits and other changes where package documentation is irrelevant. Reuse sufficient results already in context instead of searching again.
+- Pass a `packages` array to scope results when you know which packages are relevant.
+- Use multiple broad, topic-based queries: `['rate limiting', 'routing rate limiting', 'routing']`. Expect the most relevant results first.
+- Do not add package names to queries because package info is already shared. Use `test resource table`, not `filament 4 test resource table`.
+
+### Search Syntax
+
+1. Use words for auto-stemmed AND logic: `rate limit` matches both "rate" AND "limit".
+2. Use `"quoted phrases"` for exact position matching: `"infinite scroll"` requires adjacent words in order.
+3. Combine words and phrases for mixed queries: `middleware "rate limit"`.
+4. Use multiple queries for OR logic: `queries=["authentication", "middleware"]`.
+
+## Project Rules
+
+- This project contains committed, area-grouped rules in `.ai/rules` when that directory exists, including path-scoped framework guidelines under `.ai/rules/boost`. Before you enter plan mode or create/edit any file, you MUST first: open @.ai/rules/index.md (it maps file globs to rule files), read every rule file whose globs cover the path(s) in scope, and run `grep -rin 'keyword' .ai/rules` to catch what a path match alone misses. Do not write code until you have read and are following every matching rule. If `.ai/rules` does not exist, continue without it.
+
+## Artisan
+
+- Run Artisan commands directly via the command line (e.g., `php artisan route:list`). Use `php artisan list` to discover available commands and `php artisan [command] --help` to check parameters.
+- Inspect routes with `php artisan route:list`. Filter with: `--method=GET`, `--name=users`, `--path=api`, `--except-vendor`, `--only-vendor`.
+- Read configuration values using dot notation: `php artisan config:show app.name`, `php artisan config:show database.default`. Or read config files directly from the `config/` directory.
+
+## Tinker
+
+- Execute PHP in app context for debugging and testing code. Do not create models without user approval, prefer tests with factories instead. Prefer existing Artisan commands over custom tinker code.
+- Always use single quotes to prevent shell expansion: `php artisan tinker --execute 'Your::code();'`
+  - Double quotes for PHP strings inside: `php artisan tinker --execute 'User::where("active", true)->count();'`
+
+=== php rules ===
+
+# PHP
+
+- Always use curly braces for control structures, even for single-line bodies.
+- Use PHP 8 constructor property promotion: `public function __construct(public GitHub $github) { }`. Do not leave empty zero-parameter `__construct()` methods unless the constructor is private.
+- Use explicit return type declarations and type hints for all method parameters: `function isAccessible(User $user, ?string $path = null): bool`
+- Use TitleCase for Enum keys: `FavoritePerson`, `BestLake`, `Monthly`.
+- Prefer PHPDoc blocks over inline comments. Only add inline comments for exceptionally complex logic.
+- Use array shape type definitions in PHPDoc blocks.
+
+=== deployments rules ===
+
+# Deployment
+
+- Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
+- Activate the `deploying-to-cloud` skill whenever deploying to Laravel Cloud, configuring Cloud environments or resources, using the Cloud CLI, or troubleshooting Cloud deployments.
+
+=== laravel/core rules ===
+
+# Do Things the Laravel Way
+
+- Use `php artisan make:` commands to create new files (i.e. migrations, controllers, models, etc.). You can list available Artisan commands using `php artisan list` and check their parameters with `php artisan [command] --help`.
+- If you're creating a generic PHP class, use `php artisan make:class`.
+- Pass `--no-interaction` to all Artisan commands to ensure they work without user input. You should also pass the correct `--options` to ensure correct behavior.
+
+### Model Creation
+
+- When creating new models, create useful factories and seeders for them too. Ask the user if they need any other things, using `php artisan make:model --help` to check the available options.
+
+## APIs & Eloquent Resources
+
+- For APIs, default to using Eloquent API Resources and API versioning unless existing API routes do not, then you should follow existing application convention.
+
+## URL Generation
+
+- When generating links to other pages, prefer named routes and the `route()` function.
+
+## Testing
+
+- When creating models for tests, use the factories for the models. Check if the factory has custom states that can be used before manually setting up the model.
+- Faker: Use methods such as `$this->faker->word()` or `fake()->randomDigit()`. Follow existing conventions whether to use `$this->faker` or `fake()`.
+- When creating tests, make use of `php artisan make:test [options] {name}` to create a feature test, and pass `--unit` to create a unit test. Most tests should be feature tests.
+
+=== pint/core rules ===
+
+# Laravel Pint Code Formatter
+
+- If you have modified any PHP files, you must run `vendor/bin/pint --dirty --format agent` before finalizing changes to ensure your code matches the project's expected style.
+- Do not run `vendor/bin/pint --test --format agent`, simply run `vendor/bin/pint --format agent` to fix any formatting issues.
+
+=== pest/core rules ===
+
+# Pest
+
+- This project uses Pest. Create tests with `php artisan make:test --pest {name}`.
+- Do not include the test suite directory in `{name}`. Use `SomeFeatureTest`, not `Feature/SomeFeatureTest`.
+- Read the `testing-best-practices` skill for guidance on coverage, naming, structure, dependency isolation, and review.
+- Do not delete tests or test files without approval. They are part of the application.
+
+## Running Tests
+
+- Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
+- Rerun a test after each change to it.
+- Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
+- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
+
+</laravel-boost-guidelines>
