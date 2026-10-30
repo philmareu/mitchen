@@ -21,6 +21,16 @@ class InventoryItemBuilder extends Builder
             ->orWhereNotIn('stock_level', [StockLevel::Low, StockLevel::Out]));
     }
 
+    /**
+     * Items with something left: anything not marked out, low included.
+     */
+    public function notOut(): static
+    {
+        return $this->where(fn (self $query) => $query
+            ->whereNull('stock_level')
+            ->orWhere('stock_level', '!=', StockLevel::Out));
+    }
+
     public function runningLow(): static
     {
         return $this->whereIn('stock_level', [StockLevel::Low, StockLevel::Out]);

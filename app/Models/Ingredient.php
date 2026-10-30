@@ -23,19 +23,35 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *
  * A core ingredient goes on the restock list when what's on hand gets down to its
  * restock point ("¼ jar", "2 cans", "out"), or by default when it's low or out.
+ *
+ * Some are always on hand and never tracked, like tap water: recipes count them as there.
+ * Water and ice start out that way.
  */
-#[Fillable(['name', 'category', 'is_core', 'restock_point', 'notes'])]
+#[Fillable(['name', 'category', 'is_core', 'always_on_hand', 'restock_point', 'notes'])]
 #[UseEloquentBuilder(IngredientBuilder::class)]
 class Ingredient extends Model
 {
     /** @use HasFactory<IngredientFactory> */
     use HasFactory;
 
+    /**
+     * Names that start out always on hand.
+     */
+    private const array ALWAYS_ON_HAND = ['water', 'tap water', 'ice', 'ice water'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (Ingredient $ingredient): void {
+            $ingredient->always_on_hand ??= in_array(mb_strtolower(trim($ingredient->name)), self::ALWAYS_ON_HAND, true);
+        });
+    }
+
     protected function casts(): array
     {
         return [
             'category' => IngredientCategory::class,
             'is_core' => 'boolean',
+            'always_on_hand' => 'boolean',
             'restock_amount' => 'float',
             'restock_unit' => Unit::class,
             'restock_level' => StockLevel::class,

@@ -2,21 +2,25 @@
 
 namespace Database\Seeders;
 
+use App\Actions\AddRecipe;
 use App\Enums\EquipmentCategory;
 use App\Enums\IngredientCategory as Category;
 use App\Enums\StorageLocation as Location;
 use App\Models\Equipment;
 use App\Models\Ingredient;
 use App\Models\Purchase;
+use App\Models\Recipe;
 use App\Models\ShoppingListItem;
 use App\Models\Store;
+use App\Support\RecipeDraft;
+use App\Support\RecipeLine;
 use Illuminate\Database\Seeder;
 
 /**
  * A lived-in kitchen to click around: staples at every stock level, a few
  * one-off ingredients, some core items that need restocking (one by its own
- * restock point), a short shopping list, a few past shops with prices, and
- * some equipment (without photos).
+ * restock point), a short shopping list, a few past shops with prices, some
+ * equipment (without photos) and a few recipes.
  */
 class DemoKitchenSeeder extends Seeder
 {
@@ -72,6 +76,7 @@ class DemoKitchenSeeder extends Seeder
 
         $this->purchaseHistory();
         $this->equipment();
+        $this->recipes();
     }
 
     private function equipment(): void
@@ -97,6 +102,92 @@ class DemoKitchenSeeder extends Seeder
                 'size' => $size,
                 'count' => $count,
             ]);
+        }
+    }
+
+    /**
+     * Two recipes ready to cook and two missing things, one of them handwritten-card style.
+     */
+    private function recipes(): void
+    {
+        $recipes = [
+            new RecipeDraft(
+                name: 'Breakfast for dinner',
+                servings: 3,
+                ingredients: [
+                    new RecipeLine('Eggs', '6'),
+                    new RecipeLine('Milk', '2 tbsp'),
+                    new RecipeLine('Butter', '1 tbsp'),
+                    new RecipeLine('Kosher salt', 'a pinch'),
+                    new RecipeLine('Bread', '4 slices', 'toasted', isOptional: true, category: Category::Bakery),
+                ],
+                equipment: ['Cast iron skillet'],
+                steps: [
+                    'Whisk the eggs with the milk and salt.',
+                    'Melt the butter in the skillet over medium-low heat, add the eggs and stir slowly until just set.',
+                ],
+                notes: 'Nothing to do ahead. Add bacon or potatoes when there are some.',
+            ),
+            new RecipeDraft(
+                name: 'Corn tortillas',
+                source: 'Back of the masa bag',
+                servings: 16,
+                ingredients: [
+                    new RecipeLine('Masa harina', '2 cups', category: Category::Baking),
+                    new RecipeLine('Water', '1½ cups', 'warm', category: Category::Other),
+                    new RecipeLine('Kosher salt', '½ tsp'),
+                ],
+                equipment: ['Tortilla press', 'Cast iron skillet'],
+                steps: [
+                    'Mix the masa harina, water and salt into a soft dough. Cover and rest 10 minutes.',
+                    'Roll into 16 balls and press each between two sheets of plastic.',
+                    'Cook on a hot dry skillet about 1 minute a side, until spotted.',
+                ],
+            ),
+            new RecipeDraft(
+                name: 'Grandma\'s beef stew',
+                source: 'Grandma\'s card',
+                servings: 6,
+                ingredients: [
+                    new RecipeLine('Beef chuck', '2 lb', 'in 1 inch cubes', category: Category::MeatAndSeafood),
+                    new RecipeLine('All-purpose flour', '2 tbsp'),
+                    new RecipeLine('Yellow onions', '1', 'chopped'),
+                    new RecipeLine('Garlic', '3 cloves', 'minced'),
+                    new RecipeLine('Carrots', '3', 'sliced', category: Category::Produce),
+                    new RecipeLine('Potatoes', '1½ lb', 'cubed', category: Category::Produce),
+                    new RecipeLine('Beef broth', '4 cups', category: Category::CannedAndJarred),
+                ],
+                equipment: ['Slow cooker'],
+                steps: [
+                    'Defrost the beef in the fridge the night before.',
+                    'Toss the beef with the flour and brown it in batches.',
+                    'Put everything in the slow cooker and cook on low 8 hours.',
+                ],
+                notes: 'Start it before work.',
+            ),
+            new RecipeDraft(
+                name: 'Coconut chicken curry',
+                servings: 4,
+                ingredients: [
+                    new RecipeLine('Chicken thighs', '2 lb', 'cut up'),
+                    new RecipeLine('Coconut milk', '1 can'),
+                    new RecipeLine('Garlic', '2 cloves'),
+                    new RecipeLine('Ground cumin', '1 tsp'),
+                    new RecipeLine('Jasmine rice', '1½ cups'),
+                    new RecipeLine('Fresh basil', 'a handful', isOptional: true),
+                ],
+                equipment: ['Dutch oven'],
+                steps: [
+                    'Brown the chicken in the Dutch oven, then add the garlic and cumin for a minute.',
+                    'Add the coconut milk and simmer 20 minutes. Serve over rice with basil.',
+                ],
+            ),
+        ];
+
+        foreach ($recipes as $draft) {
+            if (! Recipe::query()->where('name', $draft->name)->exists()) {
+                app(AddRecipe::class)->handle($draft);
+            }
         }
     }
 

@@ -32,7 +32,7 @@ class EquipmentResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedWrenchScrewdriver;
 
-    protected static ?int $navigationSort = 4;
+    protected static ?int $navigationSort = 5;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -78,8 +78,8 @@ class EquipmentResource extends Resource
     }
 
     /**
-     * Photos of equipment, resized in the browser to the largest size Claude reads at full detail.
-     * Also used by Quick add.
+     * Photos to keep, resized in the browser to the largest size Claude reads at full detail.
+     * Also used by Quick add and for recipe photos.
      */
     public static function photoUpload(string $name): FileUpload
     {
