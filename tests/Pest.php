@@ -78,6 +78,8 @@ function readerRecipe(array $overrides = []): array
             ['quantity' => '1½ cups', 'name' => 'Water', 'note' => 'warm', 'optional' => false, 'category' => 'beverages'],
             ['quantity' => '½ tsp', 'name' => 'Kosher salt', 'note' => null, 'optional' => false, 'category' => 'spices_and_herbs'],
         ],
+        'substitutes' => [],
+        'variants' => [],
         'equipment' => ['Tortilla press'],
         'steps' => ['Mix the masa, water and salt into a soft dough.', 'Press into rounds and cook on a hot skillet, about 1 minute a side.'],
         'notes' => null,

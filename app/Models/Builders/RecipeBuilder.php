@@ -11,17 +11,18 @@ use Illuminate\Database\Eloquent\Builder;
 class RecipeBuilder extends Builder
 {
     /**
-     * Recipes the kitchen has everything for: every ingredient that isn't optional is always on
-     * hand or has some left, and all the equipment is there. Matches Recipe::missing().
+     * Recipes the kitchen has everything for (Recipe::missing() is empty). Substitutes make
+     * this too fiddly for portable SQL, so it's worked out in PHP and returned as a whereKey()
+     * scope, like IngredientBuilder::needsRestock().
      */
     public function readyToCook(): static
     {
-        return $this
-            ->whereDoesntHave('ingredients', fn (Builder $lines) => $lines
-                ->where('is_optional', false)
-                ->whereDoesntHave('ingredient', fn (IngredientBuilder $ingredient) => $ingredient->where(fn (IngredientBuilder $query) => $query
-                    ->where('always_on_hand', true)
-                    ->orWhereHas('inventoryItems', fn (InventoryItemBuilder $items) => $items->notOut()))))
-            ->whereDoesntHave('equipment', fn (Builder $pieces) => $pieces->whereNull('equipment_id'));
+        return $this->whereKey(
+            Recipe::query()
+                ->with(Recipe::KITCHEN)
+                ->get()
+                ->filter(fn (Recipe $recipe): bool => $recipe->missing() === [])
+                ->modelKeys(),
+        );
     }
 }

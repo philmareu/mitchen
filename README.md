@@ -22,6 +22,8 @@ Your recipes live alongside it, so each one shows what's on hand, what's missing
 - **Recipes, from a photo of the card.** Snap a handwritten recipe card, a cookbook page or the back of a package, or paste a recipe, and Mitchen reads its ingredients, equipment and steps, matching "flour" to the *All-purpose flour* you keep and adding anything new to your ingredients. Same review step before saving, and the photo is kept with the recipe. Or type one in.
 - **What's in the kitchen for each recipe.** Every ingredient shows *on hand*, *running low* or *out*, and where it is (`2 lb · Fridge`); every piece of equipment, whether you have it. The recipe list shows which recipes are ready to cook and what the others are missing. Put what's missing on the shopping list in one click, with the amounts the recipe calls for. Water and ice count as always on hand.
 - **Scale a recipe.** Halve or double it, and the amounts Mitchen can read are scaled (`1½ cups` becomes `¾ cup`); `a pinch` stays a pinch.
+- **Recipes that get better.** Press *Made it* to log a batch: how it turned out and what to change next time, even days later (pickles taste right on day three). *Update from notes* has Claude work your notes into the recipe ("more salt, less vinegar" becomes `1½ tsp` salt and `¾ cup` vinegar); you check it and it's saved as a new version. Every change keeps the old version, with what changed.
+- **Substitutes and variants.** A substitute stands in for one ingredient when you're out (no buttermilk: milk and lemon juice), so the recipe still counts as ready to cook. A variant is a way of making it you pick up front (mild or hot salsa, blueberry pancakes), and the ingredients and shopping list follow it. Quick add reads both off the card.
 - **AI usage and cost.** Every call to Claude is logged with its model, tokens, time and estimated cost, with this month's and all-time spend at a glance.
 
 ## Getting started
@@ -63,6 +65,7 @@ Units cover weights, volumes and the containers food comes in (jar, can, bottle,
 - [x] Inventory with flexible quantities, locations and use-by dates
 - [x] Restock and use-soon lists
 - [x] Recipes linked to ingredients and equipment, added from a photo of the card or a note, showing what's on hand
+- [x] Recipe history (a cook log and versions), substitutes and variants
 - [ ] Recipe suggestions: what you can make now, with a little shopping, or with time to prep ahead
 - [x] Equipment, added from photos or a note
 - [x] Restock points and a shopping list built from the restock list

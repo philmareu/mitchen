@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Actions\AddRecipe;
+use App\Actions\UpdateRecipe;
 use App\Enums\EquipmentCategory;
 use App\Enums\IngredientCategory as Category;
 use App\Enums\StorageLocation as Location;
@@ -14,13 +15,16 @@ use App\Models\ShoppingListItem;
 use App\Models\Store;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
+use App\Support\SubstituteDraft;
+use App\Support\VariantDraft;
 use Illuminate\Database\Seeder;
 
 /**
  * A lived-in kitchen to click around: staples at every stock level, a few
  * one-off ingredients, some core items that need restocking (one by its own
  * restock point), a short shopping list, a few past shops with prices, some
- * equipment (without photos) and a few recipes.
+ * equipment (without photos) and a few recipes: one with a substitute and a
+ * variant, one with variants, and one with a cook log and a second version.
  */
 class DemoKitchenSeeder extends Seeder
 {
@@ -44,6 +48,7 @@ class DemoKitchenSeeder extends Seeder
             ['Coconut milk', Category::CannedAndJarred, false, Location::Pantry, '2 cans', null],
             ['Fresh basil', Category::Produce, false, Location::Fridge, 'a bunch', 3],
             ['Gochujang', Category::OilsAndCondiments, false, Location::Fridge, 'three quarters of a jar', 120],
+            ['Lemon juice', Category::Produce, false, Location::Fridge, 'half a bottle', 30],
         ];
 
         $restockPoints = [
@@ -182,6 +187,52 @@ class DemoKitchenSeeder extends Seeder
                     'Add the coconut milk and simmer 20 minutes. Serve over rice with basil.',
                 ],
             ),
+            new RecipeDraft(
+                name: 'Buttermilk pancakes',
+                source: 'Mom\'s card',
+                servings: 4,
+                ingredients: [
+                    new RecipeLine('All-purpose flour', '1½ cups'),
+                    new RecipeLine('Sugar', '2 tbsp', category: Category::Baking),
+                    new RecipeLine('Baking soda', '1 tsp', category: Category::Baking),
+                    new RecipeLine('Kosher salt', '½ tsp'),
+                    new RecipeLine('Buttermilk', '1½ cups', category: Category::DairyAndEggs),
+                    new RecipeLine('Eggs', '1'),
+                    new RecipeLine('Butter', '3 tbsp', 'melted'),
+                ],
+                substitutes: [
+                    new SubstituteDraft('Buttermilk', [new RecipeLine('Milk', '1½ cups'), new RecipeLine('Lemon juice', '1½ tbsp')], 'Stir and let it sit 5 minutes.'),
+                ],
+                variants: [
+                    new VariantDraft('Blueberry', [new RecipeLine('Blueberries', '1 cup', category: Category::Produce)], 'Drop the berries onto each pancake once it\'s on the griddle.'),
+                ],
+                equipment: ['Cast iron skillet'],
+                steps: [
+                    'Whisk the flour, sugar, baking soda and salt.',
+                    'Whisk the buttermilk, egg and butter, then stir into the dry ingredients until just mixed. Lumps are fine.',
+                    'Cook ¼ cup at a time on a buttered skillet over medium heat, flipping when bubbles form.',
+                ],
+            ),
+            new RecipeDraft(
+                name: 'Fresh salsa',
+                servings: 6,
+                ingredients: [
+                    new RecipeLine('Tomatoes', '4', 'diced', category: Category::Produce),
+                    new RecipeLine('Yellow onions', '½', 'finely diced'),
+                    new RecipeLine('Jalapeño', '1', 'seeded and minced', category: Category::Produce),
+                    new RecipeLine('Garlic', '1 clove', 'minced'),
+                    new RecipeLine('Kosher salt', '½ tsp'),
+                    new RecipeLine('Cilantro', '¼ cup', 'chopped', isOptional: true, category: Category::Produce),
+                ],
+                variants: [
+                    new VariantDraft('Hot', [new RecipeLine('Jalapeño', '2', 'minced with the seeds'), new RecipeLine('Habanero', '1', 'minced', category: Category::Produce)], 'Wear gloves for the habanero.'),
+                    new VariantDraft('Kid friendly', [new RecipeLine('Jalapeño', isLeftOut: true)]),
+                ],
+                steps: [
+                    'Stir everything together.',
+                    'Let it sit 15 minutes, then taste for salt.',
+                ],
+            ),
         ];
 
         foreach ($recipes as $draft) {
@@ -189,6 +240,58 @@ class DemoKitchenSeeder extends Seeder
                 app(AddRecipe::class)->handle($draft);
             }
         }
+
+        $this->recipeWithHistory();
+    }
+
+    /**
+     * Pickled red onions: made once, too sharp, so version 2 has more salt and less vinegar;
+     * made again, with a note for next time still waiting.
+     */
+    private function recipeWithHistory(): void
+    {
+        if (Recipe::query()->where('name', 'Pickled red onions')->exists()) {
+            return;
+        }
+
+        $draft = fn (string $vinegar, string $salt): RecipeDraft => new RecipeDraft(
+            name: 'Pickled red onions',
+            servings: 1,
+            ingredients: [
+                new RecipeLine('Red onion', '1 large', 'thinly sliced', category: Category::Produce),
+                new RecipeLine('Apple cider vinegar', $vinegar, category: Category::OilsAndCondiments),
+                new RecipeLine('Water', '½ cup'),
+                new RecipeLine('Sugar', '1 tbsp', category: Category::Baking),
+                new RecipeLine('Kosher salt', $salt),
+            ],
+            equipment: ['Mason jar'],
+            steps: [
+                'Pack the onion into the jar.',
+                'Warm the vinegar, water, sugar and salt until dissolved, pour over the onion and close the jar.',
+                'Refrigerate at least a day. Best after three.',
+            ],
+            notes: 'Keeps about 2 weeks in the fridge.',
+        );
+
+        $recipe = app(AddRecipe::class)->handle($draft('1 cup', '1 tsp'));
+        $recipe->forceFill(['created_at' => now()->subDays(20)])->save();
+
+        $first = $recipe->cookLogs()->create([
+            'cooked_on' => today()->subDays(14),
+            'thoughts' => 'Tasted on day three: too sharp and a little flat.',
+            'next_time' => 'More salt, a bit less vinegar.',
+        ]);
+
+        app(UpdateRecipe::class)
+            ->handle($recipe, $draft('¾ cup', '1½ tsp'), 'More salt and a little less vinegar: the first batch was too sharp.', [$first->id])
+            ?->forceFill(['created_at' => now()->subDays(10)])
+            ->save();
+
+        $recipe->cookLogs()->create([
+            'cooked_on' => today()->subDays(5),
+            'thoughts' => 'Much better. Gone in a week.',
+            'next_time' => 'Try a few black peppercorns in the jar.',
+        ]);
     }
 
     /**

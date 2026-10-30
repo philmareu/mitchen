@@ -16,7 +16,6 @@ use Filament\Schemas\Components\Callout;
 use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Group;
 use Filament\Schemas\Components\Image;
-use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
@@ -84,17 +83,7 @@ class QuickAddRecipeAction extends Action
                             ->warning()
                             ->visible(fn (Get $get): bool => filled($get('not_understood'))),
                         $this->photoPreviews(),
-                        Grid::make(2)
-                            ->schema(RecipeResource::detailFields()),
-                        Section::make('Ingredients')
-                            ->compact()
-                            ->schema([RecipeResource::ingredientsRepeater(withAisle: true)]),
-                        Section::make('Equipment')
-                            ->compact()
-                            ->schema([RecipeResource::equipmentRepeater()]),
-                        Section::make('Steps')
-                            ->compact()
-                            ->schema([RecipeResource::stepsRepeater()]),
+                        ...RecipeResource::draftFields(),
                     ]),
             ])
             ->action(function (array $data, AddRecipe $add): void {
@@ -141,12 +130,7 @@ class QuickAddRecipeAction extends Action
             throw new Halt;
         }
 
-        foreach ($draft->toArray() as $field => $state) {
-            $set($field, $state);
-        }
-
-        // A simple repeater's items each hold their value under the field's name.
-        $set('steps', array_map(fn (string $step): array => ['step' => $step], $draft->steps));
+        RecipeResource::fillDraft($set, $draft);
     }
 
     /**

@@ -9,19 +9,25 @@ final readonly class RecipeDraft
 {
     /**
      * @param  list<RecipeLine>  $ingredients
+     * @param  list<SubstituteDraft>  $substitutes
+     * @param  list<VariantDraft>  $variants
      * @param  list<string>  $equipment
      * @param  list<string>  $steps
      * @param  list<string>  $notUnderstood
+     * @param  string|null  $changeNote  For a revision: what the assistant changed and why.
      */
     public function __construct(
         public string $name,
         public ?string $source = null,
         public ?int $servings = null,
         public array $ingredients = [],
+        public array $substitutes = [],
+        public array $variants = [],
         public array $equipment = [],
         public array $steps = [],
         public ?string $notes = null,
         public array $notUnderstood = [],
+        public ?string $changeNote = null,
     ) {}
 
     /**
@@ -47,6 +53,16 @@ final readonly class RecipeDraft
             servings: is_numeric($servings) ? (int) $servings : null,
             ingredients: collect(self::rows($state['ingredients'] ?? null))
                 ->map(fn (array $line): RecipeLine => RecipeLine::fromArray($line))
+                ->values()
+                ->all(),
+            substitutes: collect(self::rows($state['substitutes'] ?? null))
+                ->map(fn (array $substitute): SubstituteDraft => SubstituteDraft::fromArray($substitute))
+                ->filter(fn (SubstituteDraft $substitute): bool => $substitute->insteadOf !== '' && $substitute->ingredients !== [])
+                ->values()
+                ->all(),
+            variants: collect(self::rows($state['variants'] ?? null))
+                ->map(fn (array $variant): VariantDraft => VariantDraft::fromArray($variant))
+                ->filter(fn (VariantDraft $variant): bool => $variant->name !== '')
                 ->values()
                 ->all(),
             equipment: collect(self::rows($state['equipment'] ?? null))
@@ -83,10 +99,13 @@ final readonly class RecipeDraft
             'source' => $this->source,
             'servings' => $this->servings,
             'ingredients' => array_map(fn (RecipeLine $line): array => $line->toArray(), $this->ingredients),
+            'substitutes' => array_map(fn (SubstituteDraft $substitute): array => $substitute->toArray(), $this->substitutes),
+            'variants' => array_map(fn (VariantDraft $variant): array => $variant->toArray(), $this->variants),
             'equipment' => array_map(fn (string $name): array => ['name' => $name], $this->equipment),
             'steps' => $this->steps,
             'notes' => $this->notes,
             'not_understood' => $this->notUnderstood,
+            'version_note' => $this->changeNote,
         ];
     }
 }

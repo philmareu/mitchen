@@ -284,3 +284,117 @@ it('needs an API key', function () {
 
     livewire(ListRecipes::class)->assertActionDisabled('quickAddRecipe');
 });
+
+it('adds a substitute by hand and shows it under the ingredient', function () {
+    InventoryItem::factory()->for(Ingredient::factory()->create(['name' => 'Milk']))->create(['quantity' => 'half a gallon']);
+    InventoryItem::factory()->for(Ingredient::factory()->create(['name' => 'Lemon juice']))->create(['quantity' => 'plenty']);
+
+    livewire(CreateRecipe::class)
+        ->fillForm([
+            'name' => 'Buttermilk pancakes',
+            'ingredients' => [
+                ['quantity' => '1 cup', 'name' => 'Buttermilk', 'note' => null, 'is_optional' => false],
+                ['quantity' => '1', 'name' => 'Eggs', 'note' => null, 'is_optional' => false],
+            ],
+            'substitutes' => [
+                ['instead_of' => 'Buttermilk', 'note' => 'Let it sit 5 minutes.', 'ingredients' => [
+                    ['quantity' => '1 cup', 'name' => 'milk'],
+                    ['quantity' => '1 tbsp', 'name' => 'Lemon juice'],
+                ]],
+            ],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $recipe = Recipe::sole()->load(Recipe::KITCHEN);
+    [$buttermilk, $eggs] = $recipe->ingredients;
+
+    expect($recipe->substitutes->sole()->describe())->toBe('1 cup Milk + 1 tbsp Lemon juice')
+        ->and($recipe->missing())->toBe(['Eggs']);
+
+    $this->get(recipePageUrl($recipe))
+        ->assertOk()
+        ->assertSeeInOrder(['Buttermilk', 'Or 1 cup Milk + 1 tbsp Lemon juice (Let it sit 5 minutes.)', 'Substitute on hand', 'Eggs', 'Out']);
+
+    livewire(ViewRecipe::class, ['record' => $recipe->getRouteKey()])
+        ->mountAction('addToShoppingList')
+        ->assertSchemaStateSet(['lines' => [(string) $eggs->id]]);
+
+    livewire(EditRecipe::class, ['record' => $recipe->getRouteKey()])
+        ->assertSchemaStateSet(fn (array $state): bool => array_values($state['substitutes'])[0]['instead_of'] === 'Buttermilk'
+            && count(array_values($state['substitutes'])[0]['ingredients']) === 2);
+});
+
+it('only offers the recipe\'s ingredients to substitute', function () {
+    livewire(CreateRecipe::class)
+        ->fillForm([
+            'name' => 'Pancakes',
+            'ingredients' => [['quantity' => '1 cup', 'name' => 'Buttermilk', 'note' => null, 'is_optional' => false]],
+            'substitutes' => [['instead_of' => 'Sour cream', 'note' => null, 'ingredients' => [['quantity' => '1 cup', 'name' => 'Yogurt']]]],
+        ])
+        ->call('create')
+        ->assertHasFormErrors();
+
+    expect(Recipe::count())->toBe(0);
+});
+
+it('reads substitutes into the review step and saves them', function () {
+    RecipeReader::fake([readerRecipe([
+        'name' => 'Buttermilk pancakes',
+        'ingredients' => [['quantity' => '1 cup', 'name' => 'Buttermilk', 'note' => null, 'optional' => false, 'category' => 'dairy_and_eggs']],
+        'substitutes' => [['instead_of' => 'Buttermilk', 'use' => [['quantity' => '1 cup', 'name' => 'Milk', 'category' => 'dairy_and_eggs'], ['quantity' => '1 tbsp', 'name' => 'Lemon juice', 'category' => 'produce']], 'note' => null]],
+    ])]);
+
+    livewire(ListRecipes::class)
+        ->mountAction('quickAddRecipe')
+        ->fillForm(['note' => 'Buttermilk pancakes, or use milk with lemon juice'])
+        ->goToNextWizardStep()
+        ->assertWizardCurrentStep(2)
+        ->assertSchemaStateSet(fn (array $state): bool => array_values($state['substitutes'])[0]['instead_of'] === 'Buttermilk')
+        ->callMountedAction()
+        ->assertHasNoFormErrors();
+
+    expect(Recipe::sole()->substitutes->sole()->describe())->toBe('1 cup Milk + 1 tbsp Lemon juice')
+        ->and(Ingredient::query()->named('Lemon juice')->sole()->category)->toBe(IngredientCategory::Produce);
+});
+
+it('adds a variant by hand, shows it on the recipe page and logs which one was made', function () {
+    // Another recipe's variant first, so this one's id isn't the option's position.
+    Recipe::factory()->create()->variants()->create(['name' => 'Blueberry']);
+
+    livewire(CreateRecipe::class)
+        ->fillForm([
+            'name' => 'Salsa',
+            'ingredients' => [
+                ['quantity' => '4', 'name' => 'Tomatoes', 'note' => null, 'is_optional' => false],
+                ['quantity' => '1', 'name' => 'Jalapeño', 'note' => null, 'is_optional' => false],
+            ],
+            'variants' => [
+                ['name' => 'Hot', 'notes' => 'Keep the seeds in.', 'ingredients' => [
+                    ['quantity' => '3', 'name' => 'jalapeño', 'note' => null, 'is_left_out' => false],
+                    ['quantity' => '1', 'name' => 'Habanero', 'note' => null, 'is_left_out' => false],
+                ]],
+            ],
+        ])
+        ->call('create')
+        ->assertHasNoFormErrors();
+
+    $recipe = Recipe::query()->where('name', 'Salsa')->sole();
+    $hot = $recipe->variants->sole();
+
+    livewire(ViewRecipe::class, ['record' => $recipe->getRouteKey()])
+        ->assertSee('Variant')
+        ->assertDontSee('Habanero')
+        ->callAction('variant', data: ['variant' => (string) $hot->id])
+        ->assertSet('variant', $hot->id)
+        ->assertSee('Making it Hot: Keep the seeds in.')
+        ->assertSee('Making Hot')
+        // After a call the assertion reads the JSON response, where ñ is escaped.
+        ->assertSeeInOrder(['Tomatoes', '3', 'Jalape', 'for Hot', 'Habanero'])
+        ->mountAction('madeIt')
+        ->assertSchemaStateSet(['variant' => 'Hot'])
+        ->callMountedAction()
+        ->assertHasNoFormErrors();
+
+    expect($recipe->cookLogs()->sole()->madeAs())->toBe('Version 1, Hot');
+});

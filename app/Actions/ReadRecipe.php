@@ -8,6 +8,9 @@ use App\Models\Equipment;
 use App\Models\Ingredient;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
+use App\Support\SubstituteDraft;
+use App\Support\VariantDraft;
+use ArrayAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Laravel\Ai\Files\Image;
@@ -16,7 +19,8 @@ use Laravel\Ai\Files\LocalImage;
 /**
  * Asks the assistant for the recipe in the photos or note, then tidies its answer: names
  * that match the catalog or the kitchen's equipment (ignoring case) take their spelling,
- * servings that aren't a positive number are dropped, and empty lines are skipped.
+ * servings that aren't a positive number are dropped, empty lines are skipped, and substitutes
+ * for an ingredient the recipe doesn't have are dropped.
  */
 class ReadRecipe
 {
@@ -33,6 +37,18 @@ class ReadRecipe
             attachments: array_map(fn (string $path): LocalImage => Image::fromPath($path), $photos),
         );
 
+        return $this->tidy($response, $ingredients, $equipment);
+    }
+
+    /**
+     * Turn the assistant's answer into a draft. Also used for revisions (ReviseRecipe).
+     *
+     * @param  array<string, mixed>|ArrayAccess<string, mixed>  $response
+     * @param  Collection<int, string>  $ingredients  The catalog's names.
+     * @param  Collection<int, string>  $equipment  The kitchen's equipment names.
+     */
+    public function tidy(array|ArrayAccess $response, Collection $ingredients, Collection $equipment): RecipeDraft
+    {
         $lines = collect($this->list($response['ingredients'] ?? null))
             ->map(fn (mixed $line): ?RecipeLine => is_array($line) ? $this->line($line, $ingredients) : null)
             ->filter()
@@ -47,6 +63,16 @@ class ReadRecipe
             source: $this->text($response['source'] ?? null),
             servings: is_numeric($servings) && $servings >= 1 ? min((int) $servings, 999) : null,
             ingredients: $lines,
+            substitutes: collect($this->list($response['substitutes'] ?? null))
+                ->map(fn (mixed $substitute): ?SubstituteDraft => is_array($substitute) ? $this->substitute($substitute, $lines, $ingredients) : null)
+                ->filter()
+                ->values()
+                ->all(),
+            variants: collect($this->list($response['variants'] ?? null))
+                ->map(fn (mixed $variant): ?VariantDraft => is_array($variant) ? $this->variant($variant, $lines, $ingredients) : null)
+                ->filter()
+                ->values()
+                ->all(),
             equipment: collect($this->texts($response['equipment'] ?? null))
                 ->map(fn (string $name): string => $this->spelledAs($name, $equipment))
                 ->unique(fn (string $name): string => mb_strtolower($name))
@@ -55,6 +81,7 @@ class ReadRecipe
             steps: $steps,
             notes: $this->text($response['notes'] ?? null),
             notUnderstood: $this->texts($response['not_understood'] ?? null),
+            changeNote: $this->text($response['summary'] ?? null),
         );
     }
 
@@ -75,8 +102,58 @@ class ReadRecipe
             quantity: $this->text($line['quantity'] ?? null),
             note: $this->text($line['note'] ?? null),
             isOptional: ($line['optional'] ?? false) === true,
+            isLeftOut: ($line['leave_out'] ?? false) === true,
             category: IngredientCategory::tryFrom((string) ($line['category'] ?? '')) ?? IngredientCategory::Other,
         );
+    }
+
+    /**
+     * A substitute for one of the recipe's lines, taking that line's spelling; null when it
+     * isn't for one of them or has nothing in it.
+     *
+     * @param  array<string, mixed>  $substitute
+     * @param  list<RecipeLine>  $lines
+     * @param  Collection<int, string>  $catalog
+     */
+    private function substitute(array $substitute, array $lines, Collection $catalog): ?SubstituteDraft
+    {
+        $insteadOf = $this->spelledAs((string) $this->text($substitute['instead_of'] ?? null), collect($lines)->map(fn (RecipeLine $line): string => $line->name));
+
+        $use = collect($this->list($substitute['use'] ?? null))
+            ->map(fn (mixed $line): ?RecipeLine => is_array($line) ? $this->line($line, $catalog) : null)
+            ->filter()
+            ->values()
+            ->all();
+
+        if ($use === [] || ! collect($lines)->contains(fn (RecipeLine $line): bool => $line->name === $insteadOf)) {
+            return null;
+        }
+
+        return new SubstituteDraft($insteadOf, $use, $this->text($substitute['note'] ?? null));
+    }
+
+    /**
+     * A variant, its changes to the recipe's lines taking their spelling; null without a name.
+     *
+     * @param  array<string, mixed>  $variant
+     * @param  list<RecipeLine>  $lines
+     * @param  Collection<int, string>  $catalog
+     */
+    private function variant(array $variant, array $lines, Collection $catalog): ?VariantDraft
+    {
+        $name = $this->text($variant['name'] ?? null);
+
+        if ($name === null) {
+            return null;
+        }
+
+        $changes = collect($this->list($variant['changes'] ?? null))
+            ->map(fn (mixed $line): ?RecipeLine => is_array($line) ? $this->line($line, collect($lines)->map(fn (RecipeLine $own): string => $own->name)->concat($catalog)) : null)
+            ->filter()
+            ->values()
+            ->all();
+
+        return new VariantDraft(Str::ucfirst($name), $changes, $this->text($variant['notes'] ?? null));
     }
 
     /**

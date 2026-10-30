@@ -8,6 +8,7 @@ use App\Support\Quantity;
 use App\Support\UnreadableQuantity;
 use Database\Factories\RecipeIngredientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -20,8 +21,11 @@ use Illuminate\Support\Str;
  * Whenever its name changes (or it lost its link) it's linked to the catalog ingredient of
  * that name, taking its spelling. A name that isn't in the catalog is added to it as a
  * one-off, so buying it later, or putting it on the shopping list, finds the same ingredient.
+ *
+ * The lines of a substitute (`substitute_id`) and a variant's changes (`variant_id`, where
+ * `is_left_out` means the variant goes without it) are RecipeIngredients too, in the same recipe.
  */
-#[Fillable(['name', 'quantity', 'note', 'is_optional', 'sort'])]
+#[Fillable(['name', 'quantity', 'note', 'is_optional', 'is_left_out', 'sort'])]
 class RecipeIngredient extends Model
 {
     /** @use HasFactory<RecipeIngredientFactory> */
@@ -30,6 +34,14 @@ class RecipeIngredient extends Model
     protected static function booted(): void
     {
         static::saving(function (RecipeIngredient $line): void {
+            if ($line->isDirty('substitute_id') && $line->substitute !== null) {
+                $line->recipe()->associate($line->substitute->recipe_id);
+            }
+
+            if ($line->isDirty('variant_id') && $line->variant !== null) {
+                $line->recipe()->associate($line->variant->recipe_id);
+            }
+
             if ($line->ingredient_id !== null && ! $line->isDirty('name')) {
                 return;
             }
@@ -46,6 +58,7 @@ class RecipeIngredient extends Model
     {
         return [
             'is_optional' => 'boolean',
+            'is_left_out' => 'boolean',
         ];
     }
 
@@ -55,6 +68,26 @@ class RecipeIngredient extends Model
     public function recipe(): BelongsTo
     {
         return $this->belongsTo(Recipe::class);
+    }
+
+    /**
+     * The substitute this is a line of; null for the recipe's own lines.
+     *
+     * @return BelongsTo<RecipeSubstitute, $this>
+     */
+    public function substitute(): BelongsTo
+    {
+        return $this->belongsTo(RecipeSubstitute::class);
+    }
+
+    /**
+     * The variant this line is a change of; null for the recipe's own lines.
+     *
+     * @return BelongsTo<RecipeVariant, $this>
+     */
+    public function variant(): BelongsTo
+    {
+        return $this->belongsTo(RecipeVariant::class);
     }
 
     /**
@@ -83,6 +116,37 @@ class RecipeIngredient extends Model
             $quantities->contains(fn (Quantity $quantity): bool => $quantity->level === StockLevel::Low) => Availability::Low,
             default => Availability::Out,
         };
+    }
+
+    /**
+     * What the recipe says to use instead of it.
+     *
+     * @return Collection<int, RecipeSubstitute>
+     */
+    public function substitutes(): Collection
+    {
+        if ($this->ingredient_id === null || $this->substitute_id !== null) {
+            return new Collection;
+        }
+
+        return $this->recipe->substitutes->where('ingredient_id', $this->ingredient_id)->values();
+    }
+
+    /**
+     * A substitute the kitchen has (one that's all on hand before one that's running low).
+     */
+    public function substituteOnHand(): ?RecipeSubstitute
+    {
+        return $this->substitutes()->first(fn (RecipeSubstitute $substitute): bool => $substitute->availability() === Availability::OnHand)
+            ?? $this->substitutes()->first(fn (RecipeSubstitute $substitute): bool => $substitute->availability() === Availability::Low);
+    }
+
+    /**
+     * It's out, but a substitute isn't: the recipe can still be made.
+     */
+    public function isCoveredBySubstitute(): bool
+    {
+        return $this->availability() === Availability::Out && $this->substituteOnHand() !== null;
     }
 
     /**

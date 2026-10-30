@@ -11,6 +11,7 @@ final readonly class RecipeLine
 {
     /**
      * @param  IngredientCategory|null  $category  The aisle, for an ingredient new to the catalog.
+     * @param  bool  $isLeftOut  A variant's change that goes without the ingredient.
      */
     public function __construct(
         public string $name,
@@ -18,6 +19,7 @@ final readonly class RecipeLine
         public ?string $note = null,
         public bool $isOptional = false,
         public ?IngredientCategory $category = null,
+        public bool $isLeftOut = false,
     ) {}
 
     /**
@@ -33,11 +35,12 @@ final readonly class RecipeLine
             note: filled($state['note'] ?? null) ? trim((string) $state['note']) : null,
             isOptional: (bool) ($state['is_optional'] ?? false),
             category: $category instanceof IngredientCategory ? $category : IngredientCategory::tryFrom((string) $category),
+            isLeftOut: (bool) ($state['is_left_out'] ?? false),
         );
     }
 
     /**
-     * @return array{name: string, quantity: string|null, note: string|null, is_optional: bool, category: string|null}
+     * @return array{name: string, quantity: string|null, note: string|null, is_optional: bool, is_left_out: bool, category: string|null}
      */
     public function toArray(): array
     {
@@ -46,6 +49,7 @@ final readonly class RecipeLine
             'quantity' => $this->quantity,
             'note' => $this->note,
             'is_optional' => $this->isOptional,
+            'is_left_out' => $this->isLeftOut,
             'category' => $this->category?->value,
         ];
     }

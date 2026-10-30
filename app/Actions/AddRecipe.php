@@ -52,6 +52,17 @@ class AddRecipe
             'photos' => $photos,
         ]);
 
+        $this->addLines($recipe, $draft);
+
+        return $recipe;
+    }
+
+    /**
+     * Add the draft's ingredient lines, substitutes, variants and equipment to the recipe. Also
+     * used by UpdateRecipe.
+     */
+    public function addLines(Recipe $recipe, RecipeDraft $draft): void
+    {
         foreach ($draft->ingredients as $sort => $line) {
             $this->addToCatalog($line);
 
@@ -64,11 +75,50 @@ class AddRecipe
             ]);
         }
 
+        foreach ($draft->substitutes as $sort => $draftSubstitute) {
+            $substitute = $recipe->substitutes()->create([
+                'instead_of' => $draftSubstitute->insteadOf,
+                'note' => $draftSubstitute->note,
+                'sort' => $sort,
+            ]);
+
+            foreach ($draftSubstitute->ingredients as $lineSort => $line) {
+                $this->addToCatalog($line);
+
+                $substitute->ingredients()->create([
+                    'name' => $line->name,
+                    'quantity' => $line->quantity,
+                    'note' => $line->note,
+                    'is_optional' => $line->isOptional,
+                    'sort' => $lineSort,
+                ]);
+            }
+        }
+
+        foreach ($draft->variants as $sort => $draftVariant) {
+            $variant = $recipe->variants()->create([
+                'name' => $draftVariant->name,
+                'notes' => $draftVariant->notes,
+                'sort' => $sort,
+            ]);
+
+            foreach ($draftVariant->ingredients as $lineSort => $line) {
+                $this->addToCatalog($line);
+
+                $variant->ingredients()->create([
+                    'name' => $line->name,
+                    'quantity' => $line->quantity,
+                    'note' => $line->note,
+                    'is_optional' => $line->isOptional,
+                    'is_left_out' => $line->isLeftOut,
+                    'sort' => $lineSort,
+                ]);
+            }
+        }
+
         foreach ($draft->equipment as $sort => $name) {
             $recipe->equipment()->create(['name' => $name, 'sort' => $sort]);
         }
-
-        return $recipe;
     }
 
     /**
