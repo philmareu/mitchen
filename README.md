@@ -4,7 +4,7 @@
 
 Mitchen keeps track of your ingredients and how much of each you have, without making you weigh anything. Type `half a jar`, `2 lb`, `a couple cans` or just `low`, and it understands. It knows which ingredients are staples you always keep on hand, so it can tell you what to restock, keep a shopping list, and remind you what to use before it goes off.
 
-It's the foundation for a bigger idea: recipes, equipment, meal planning and an AI assistant that cooks with what you actually have.
+It's the foundation for a bigger idea: recipes, meal planning and an AI assistant that cooks with the ingredients and equipment you actually have.
 
 ## Features
 
@@ -18,6 +18,7 @@ It's the foundation for a bigger idea: recipes, equipment, meal planning and an 
 - **Quick update, powered by Claude.** Type "bought 2 lbs chicken thighs and a jar of peanut butter, out of milk, half a bag of rice left, need eggs" and Mitchen turns it into a list of changes: new supply, what's left, what's used up, what to buy. You check and edit the list before anything is saved.
 - **Snap a grocery receipt.** Add a photo (or a few, for a long receipt) and Mitchen decodes lines like `BNLS SKNLS CHKN THGH 2.13 lb` into "Chicken thighs, 2.13 lb, fridge", matches them to what you already keep, reads the store, date, total and line prices for your purchase history, leaves out bags and tax, and takes what you bought off the shopping list, paper towels included (including anything you already ticked in the store, so nothing is counted twice). Same review step before saving; photos are never stored.
 - **Take stock with a photo.** Photograph a shelf of labeled jars, the fridge or the pantry, and Mitchen reads the labels, counts cans and cartons, and judges how full each jar is ("⅓ jar of flour"). If a photo shows a whole shelf or fridge and something you have on record isn't in it, it asks whether that's gone rather than assuming.
+- **Equipment, from photos.** Photograph your stand mixer, a shelf of pans or a drawer of utensils, or just describe them ("two half sheet pans, a 7 qt Lodge Dutch oven, the blender died"), and Mitchen lists each piece with its brand and size, matched against what you already have. Same review step before saving. Unlike receipts, these photos are kept with each piece as a picture of your own gear; crop a drawer shot down to one utensil in the editor.
 - **AI usage and cost.** Every call to Claude is logged with its model, tokens, time and estimated cost, with this month's and all-time spend at a glance.
 
 ## Getting started
@@ -59,7 +60,7 @@ Units cover weights, volumes and the containers food comes in (jar, can, bottle,
 - [x] Inventory with flexible quantities, locations and use-by dates
 - [x] Restock and use-soon lists
 - [ ] Recipes linked to ingredients, with "what can I make right now?"
-- [ ] Equipment
+- [x] Equipment, added from photos or a note
 - [x] Restock points and a shopping list built from the restock list
 - [ ] Meal planning, adding to the shopping list from the plan
 - [x] Quick updates in plain language ("bought 2 lbs chicken, out of milk, need eggs"), reviewed before saving

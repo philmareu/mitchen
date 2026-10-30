@@ -2,8 +2,10 @@
 
 namespace Database\Seeders;
 
+use App\Enums\EquipmentCategory;
 use App\Enums\IngredientCategory as Category;
 use App\Enums\StorageLocation as Location;
+use App\Models\Equipment;
 use App\Models\Ingredient;
 use App\Models\Purchase;
 use App\Models\ShoppingListItem;
@@ -13,7 +15,8 @@ use Illuminate\Database\Seeder;
 /**
  * A lived-in kitchen to click around: staples at every stock level, a few
  * one-off ingredients, some core items that need restocking (one by its own
- * restock point), a short shopping list, and a few past shops with prices.
+ * restock point), a short shopping list, a few past shops with prices, and
+ * some equipment (without photos).
  */
 class DemoKitchenSeeder extends Seeder
 {
@@ -68,6 +71,33 @@ class DemoKitchenSeeder extends Seeder
         ShoppingListItem::firstOrCreate(['name' => 'Paper towels']);
 
         $this->purchaseHistory();
+        $this->equipment();
+    }
+
+    private function equipment(): void
+    {
+        // [name, category, brand, size, count]
+        $equipment = [
+            ['Stand mixer', EquipmentCategory::Appliances, 'KitchenAid Artisan', '5 qt', 1],
+            ['Slow cooker', EquipmentCategory::Appliances, 'Crock-Pot', '6 qt', 1],
+            ['Cast iron skillet', EquipmentCategory::Cookware, 'Lodge', '10 in', 1],
+            ['Dutch oven', EquipmentCategory::Cookware, null, '5 qt', 1],
+            ['Sheet pan', EquipmentCategory::Bakeware, null, 'Half sheet', 2],
+            ['Chef\'s knife', EquipmentCategory::Knives, null, '8 in', 1],
+            ['Ladle', EquipmentCategory::Utensils, null, null, 1],
+            ['Potato ricer', EquipmentCategory::Tools, null, null, 1],
+            ['Tortilla press', EquipmentCategory::Tools, null, '8 in', 1],
+            ['Mixing bowls', EquipmentCategory::Prep, null, null, 3],
+        ];
+
+        foreach ($equipment as [$name, $category, $brand, $size, $count]) {
+            Equipment::firstOrCreate(['name' => $name], [
+                'category' => $category,
+                'brand' => $brand,
+                'size' => $size,
+                'count' => $count,
+            ]);
+        }
     }
 
     /**

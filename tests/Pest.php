@@ -40,6 +40,28 @@ function readerChange(array $overrides = []): array
 }
 
 /**
+ * One piece as EquipmentReader returns it.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function readerPiece(array $overrides = []): array
+{
+    return [
+        'kind' => 'added',
+        'equipment_id' => null,
+        'name' => 'Potato ricer',
+        'category' => 'tools',
+        'brand' => null,
+        'size' => null,
+        'count' => 1,
+        'photos' => [1],
+        'from_note' => 'on the counter',
+        ...$overrides,
+    ];
+}
+
+/**
  * A real (1×1) JPEG, so MIME detection works without GD.
  */
 function fakeReceiptPhoto(string $name = 'receipt.jpg'): UploadedFile
