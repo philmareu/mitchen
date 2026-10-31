@@ -125,6 +125,15 @@ final readonly class Quantity implements Stringable
     }
 
     /**
+     * This amount multiplied, in the same unit ("1½ cups" × ½ is "¾ cup"). A stock level or
+     * an unknown quantity stays as it is.
+     */
+    public function times(float $factor): self
+    {
+        return $this->amount === null ? $this : self::of($this->amount * $factor, $this->unit);
+    }
+
+    /**
      * This amount in another unit, or null when it isn't measured or can't be converted.
      * Plain counts only compare with plain counts, containers only with the same container.
      */

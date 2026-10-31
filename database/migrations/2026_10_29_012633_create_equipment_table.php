@@ -1,0 +1,37 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('equipment', function (Blueprint $table) {
+            $table->id();
+            $table->string('name');
+            $table->string('category')->nullable();
+            // Make and model, such as "KitchenAid Artisan".
+            $table->string('brand')->nullable();
+            // Free text: "5 qt", "10 in", "9×13 in".
+            $table->string('size')->nullable();
+            $table->unsignedSmallInteger('count')->default(1);
+            // Paths on the local (private) disk.
+            $table->json('photos')->nullable();
+            $table->text('notes')->nullable();
+            $table->timestamps();
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('equipment');
+    }
+};

@@ -40,6 +40,55 @@ function readerChange(array $overrides = []): array
 }
 
 /**
+ * One piece as EquipmentReader returns it.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function readerPiece(array $overrides = []): array
+{
+    return [
+        'kind' => 'added',
+        'equipment_id' => null,
+        'name' => 'Potato ricer',
+        'category' => 'tools',
+        'brand' => null,
+        'size' => null,
+        'count' => 1,
+        'photos' => [1],
+        'from_note' => 'on the counter',
+        ...$overrides,
+    ];
+}
+
+/**
+ * A recipe as RecipeReader returns it.
+ *
+ * @param  array<string, mixed>  $overrides
+ * @return array<string, mixed>
+ */
+function readerRecipe(array $overrides = []): array
+{
+    return [
+        'name' => 'Corn tortillas',
+        'source' => 'Back of the masa bag',
+        'servings' => 16,
+        'ingredients' => [
+            ['quantity' => '2 cups', 'name' => 'Masa harina', 'note' => null, 'optional' => false, 'category' => 'baking'],
+            ['quantity' => '1½ cups', 'name' => 'Water', 'note' => 'warm', 'optional' => false, 'category' => 'beverages'],
+            ['quantity' => '½ tsp', 'name' => 'Kosher salt', 'note' => null, 'optional' => false, 'category' => 'spices_and_herbs'],
+        ],
+        'substitutes' => [],
+        'variants' => [],
+        'equipment' => ['Tortilla press'],
+        'steps' => ['Mix the masa, water and salt into a soft dough.', 'Press into rounds and cook on a hot skillet, about 1 minute a side.'],
+        'notes' => null,
+        'not_understood' => [],
+        ...$overrides,
+    ];
+}
+
+/**
  * A real (1×1) JPEG, so MIME detection works without GD.
  */
 function fakeReceiptPhoto(string $name = 'receipt.jpg'): UploadedFile

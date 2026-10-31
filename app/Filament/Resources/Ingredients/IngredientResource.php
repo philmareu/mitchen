@@ -40,7 +40,7 @@ class IngredientResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedTag;
 
-    protected static ?int $navigationSort = 3;
+    protected static ?int $navigationSort = 4;
 
     protected static ?string $recordTitleAttribute = 'name';
 
@@ -78,6 +78,10 @@ class IngredientResource extends Resource
                 ->hint(fn (?string $state): ?string => InventoryItemResource::readsAs($state))
                 ->visible(fn (Get $get): bool => (bool) $get('is_core'))
                 ->rules([InventoryItemResource::quantityRule(), self::restockPointRule()])
+                ->columnSpanFull(),
+            Toggle::make('always_on_hand')
+                ->label('Always on hand')
+                ->helperText('Never tracked and never out, like tap water or ice. Recipes count it as there.')
                 ->columnSpanFull(),
             Textarea::make('notes')
                 ->rows(2)
@@ -140,7 +144,11 @@ class IngredientResource extends Resource
                         ->all())
                     ->badge()
                     ->color(fn (Ingredient $record): string => $record->needsRestocking() ? 'danger' : 'gray')
-                    ->placeholder(fn (Ingredient $record): string => $record->is_core ? 'None — restock' : 'None'),
+                    ->placeholder(fn (Ingredient $record): string => match (true) {
+                        $record->always_on_hand => 'Always',
+                        $record->is_core => 'None — restock',
+                        default => 'None',
+                    }),
                 TextColumn::make('last_paid')
                     ->label('Last paid')
                     ->state(fn (Ingredient $record): ?string => $record->lastPaid?->formattedPrice())

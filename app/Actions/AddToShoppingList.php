@@ -4,6 +4,9 @@ namespace App\Actions;
 
 use App\Enums\IngredientCategory;
 use App\Models\Ingredient;
+use App\Models\Recipe;
+use App\Models\RecipeIngredient;
+use App\Models\RecipeVariant;
 use App\Models\ShoppingListItem;
 
 class AddToShoppingList
@@ -30,6 +33,22 @@ class AddToShoppingList
         $entry->save();
 
         return $entry;
+    }
+
+    /**
+     * Add some of a recipe's ingredients, with the amount it calls for when that's an amount
+     * Mitchen can read ("2 cups", scaled with the recipe), and none for "to taste".
+     *
+     * @param  list<int>  $lineIds  Its ingredient lines to add (Recipe::linesFor() the variant).
+     * @return list<string> The names added.
+     */
+    public function fromRecipe(Recipe $recipe, array $lineIds, float $scale = 1, ?RecipeVariant $variant = null): array
+    {
+        return $recipe->linesFor($variant)
+            ->whereIn('id', $lineIds)
+            ->map(fn (RecipeIngredient $line): string => $this->handle($line->ingredient ?? $line->name, $line->measuredQuantity($scale)?->format())->name)
+            ->values()
+            ->all();
     }
 
     /**
