@@ -477,6 +477,7 @@ class RecipeResource extends Resource
                             ->placeholder('—'),
                         ImageEntry::make('photos')
                             ->imageHeight('10rem')
+                            ->checkFileExistence(false)
                             ->belowContent(fn (Recipe $record): ?HtmlString => self::photoLinks($record))
                             ->visible(fn (Recipe $record): bool => filled($record->photos)),
                     ])
@@ -503,7 +504,8 @@ class RecipeResource extends Resource
                     ->label('')
                     ->imageHeight(48)
                     ->square()
-                    ->limit(1),
+                    ->limit(1)
+                    ->checkFileExistence(false),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()

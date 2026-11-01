@@ -21,6 +21,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Uploads wait on this server even when photos are kept on S3: Quick update and Quick add
+        // read them from a local path, and Quick update's are never kept.
+        config(['livewire.temporary_file_upload.disk' => 'local']);
     }
 }

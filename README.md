@@ -43,6 +43,8 @@ php artisan serve
 
 For a real install, skip `--seed` and create your own login with `php artisan make:filament-user`.
 
+Photos (recipe cards and equipment) are kept privately in `storage/app/private`. To keep them on S3 instead, set `FILESYSTEM_DISK=s3` and the `AWS_*` values, and give the bucket a CORS rule allowing `GET` from your app's URL so the photo fields and editor can load them.
+
 Quick update and photo reading use the [Laravel AI SDK](https://github.com/laravel/ai) with Anthropic. Set `ANTHROPIC_API_KEY` in `.env` to turn them on; everything else works without it. Typed notes run on the fast model (`ANTHROPIC_FAST_MODEL`, Claude Haiku by default) and photos on your main model (`ANTHROPIC_MODEL`). Cost estimates use the rates in `config/ai.php`; on Claude Sonnet a receipt costs about a cent and a shelf photo about three.
 
 ## How quantities work

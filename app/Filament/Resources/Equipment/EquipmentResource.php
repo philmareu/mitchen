@@ -110,7 +110,8 @@ class EquipmentResource extends Resource
                     ->square()
                     ->stacked()
                     ->limit(3)
-                    ->limitedRemainingText(),
+                    ->limitedRemainingText()
+                    ->checkFileExistence(false),
                 TextColumn::make('name')
                     ->searchable()
                     ->sortable()
