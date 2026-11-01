@@ -4,8 +4,10 @@ use App\Enums\StockLevel;
 use App\Enums\StorageLocation;
 use App\Filament\Widgets\RestockList;
 use App\Filament\Widgets\UseSoon;
+use App\Filament\Widgets\WhatToCook;
 use App\Models\Ingredient;
 use App\Models\InventoryItem;
+use App\Models\Recipe;
 use App\Models\ShoppingListItem;
 use Filament\Actions\Testing\TestAction;
 
@@ -16,6 +18,7 @@ beforeEach(fn () => actingAsCook());
 it('opens on the dashboard', function () {
     $this->get('/')
         ->assertOk()
+        ->assertSeeLivewire(WhatToCook::class)
         ->assertSeeLivewire(RestockList::class)
         ->assertSeeLivewire(UseSoon::class);
 });
@@ -99,4 +102,51 @@ it('lists what to use soon', function () {
     livewire(UseSoon::class)
         ->assertCanSeeTableRecords([$soon])
         ->assertCanNotSeeTableRecords([$later, $gone]);
+});
+
+/**
+ * A recipe with these ingredients, the ones in $onHand stocked.
+ *
+ * @param  list<string>  $ingredients
+ * @param  list<string>  $onHand
+ */
+function dinner(string $name, array $ingredients, array $onHand = []): Recipe
+{
+    $recipe = Recipe::factory()->create(['name' => $name]);
+
+    foreach ($ingredients as $ingredient) {
+        $line = $recipe->ingredients()->create(['name' => $ingredient]);
+
+        if (in_array($ingredient, $onHand, true)) {
+            InventoryItem::factory()->for($line->ingredient)->create(['quantity' => 'plenty']);
+        }
+    }
+
+    return $recipe;
+}
+
+it('suggests what to cook: ready first, then a quick shop, then planning ahead', function () {
+    Ingredient::factory()->makeAhead(3)->create(['name' => 'Pickled red onions']);
+
+    $tacos = dinner('Tacos', ['Tortillas', 'Pickled red onions'], onHand: ['Tortillas']);
+    $eggs = dinner('Fried eggs', ['Eggs'], onHand: ['Eggs']);
+    $omelet = dinner('Omelet', ['Eggs', 'Chives']);
+    $stew = dinner('Stew', ['Beef', 'Carrots', 'Potatoes', 'Onions']);
+    $waffles = dinner('Waffles', ['Eggs']);
+    $waffles->equipment()->create(['name' => 'Waffle iron']);
+    $lastWeek = dinner('Scrambled eggs', ['Eggs']);
+    $lastWeek->cookLogs()->create(['cooked_on' => today()->subWeek()]);
+    $eggs->cookLogs()->create(['cooked_on' => today()->subMonth()]);
+
+    livewire(WhatToCook::class)
+        ->assertCanSeeTableRecords([$eggs, $lastWeek, $omelet, $tacos], inOrder: true)
+        ->assertCanNotSeeTableRecords([$stew, $waffles])
+        ->assertTableColumnHasDescription('ready', 'Pickled red onions (make ahead, about 3 days)', $tacos)
+        ->assertTableActionHidden('addToShoppingList', $eggs)
+        ->assertTableActionHidden('addToShoppingList', $tacos)
+        ->callTableAction('addToShoppingList', $omelet)
+        ->assertNotified('Added Chives to the shopping list')
+        ->assertTableActionHidden('addToShoppingList', $omelet);
+
+    expect(ShoppingListItem::sole()->name)->toBe('Chives');
 });

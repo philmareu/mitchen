@@ -69,6 +69,24 @@ class ViewRecipe extends ViewRecord
         return $this->record->name;
     }
 
+    /**
+     * How close the kitchen is to making it the way it's shown ("A quick shop: Limes"), and a
+     * variant that's closer, if there is one.
+     */
+    public function getSubheading(): string
+    {
+        $shortfall = $this->record->shortfall($this->variant());
+        $closest = $this->record->closestShortfall();
+        $readiness = $shortfall->readiness();
+
+        return collect([
+            $readiness->getLabel().($shortfall->describe() === '' ? '.' : ': '.$shortfall->describe().'.'),
+            $closest->variant !== null && $closest->readiness()->isCloserThan($readiness)
+                ? $closest->readiness()->getLabel().' as '.$closest->variant->name.'.'
+                : null,
+        ])->filter()->join(' ');
+    }
+
     protected function resolveRecord(int|string $key): Model
     {
         return parent::resolveRecord($key)->load([

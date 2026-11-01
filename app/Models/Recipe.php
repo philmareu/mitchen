@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\Availability;
 use App\Models\Builders\RecipeBuilder;
 use App\Models\Concerns\OwnsPhotos;
+use App\Support\RecipeShortfall;
 use Database\Factories\RecipeFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
@@ -207,22 +208,50 @@ class Recipe extends Model
     }
 
     /**
-     * What it needs that the kitchen doesn't have: ingredients that are out with no substitute
-     * on hand (optional ones aside) and equipment that isn't listed.
+     * What it needs that the kitchen doesn't have, made as written: the names of ingredients
+     * that are out with no substitute on hand (optional ones aside) and equipment that isn't listed.
      *
      * @return list<string>
      */
     public function missing(): array
     {
-        $ingredients = $this->ingredients
-            ->filter(fn (RecipeIngredient $line): bool => ! $line->is_optional && $line->availability() === Availability::Out && ! $line->isCoveredBySubstitute())
-            ->map(fn (RecipeIngredient $line): string => $line->name);
+        return $this->shortfall()->names();
+    }
 
-        $equipment = $this->equipment
-            ->reject(fn (RecipeEquipment $piece): bool => $piece->isInKitchen())
-            ->map(fn (RecipeEquipment $piece): string => $piece->name);
+    /**
+     * What it needs that the kitchen doesn't have, made as written or as a variant.
+     */
+    public function shortfall(?RecipeVariant $variant = null): RecipeShortfall
+    {
+        return new RecipeShortfall(
+            ingredients: $this->linesFor($variant)
+                ->filter(fn (RecipeIngredient $line): bool => ! $line->is_optional && $line->availability() === Availability::Out && ! $line->isCoveredBySubstitute())
+                ->values(),
+            equipment: $this->equipment
+                ->reject(fn (RecipeEquipment $piece): bool => $piece->isInKitchen())
+                ->map(fn (RecipeEquipment $piece): string => $piece->name)
+                ->values()
+                ->all(),
+            variant: $variant,
+        );
+    }
 
-        return $ingredients->toBase()->concat($equipment)->values()->all();
+    /**
+     * The closest way to make it: as written, unless a variant is closer (a variant without
+     * cilantro is ready to cook when the cilantro's out). Among those, the one missing least.
+     */
+    public function closestShortfall(): RecipeShortfall
+    {
+        $asWritten = $this->shortfall();
+
+        return $this->variants
+            ->map(fn (RecipeVariant $variant): RecipeShortfall => $this->shortfall($variant))
+            ->filter(fn (RecipeShortfall $shortfall): bool => $shortfall->readiness()->isCloserThan($asWritten->readiness()))
+            ->sortBy([
+                fn (RecipeShortfall $a, RecipeShortfall $b): int => $a->readiness()->rank() <=> $b->readiness()->rank(),
+                fn (RecipeShortfall $a, RecipeShortfall $b): int => $a->ingredients->count() <=> $b->ingredients->count(),
+            ])
+            ->first() ?? $asWritten;
     }
 
     /**
