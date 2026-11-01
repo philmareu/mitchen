@@ -69,7 +69,7 @@ A kitchen assistant: ingredients, what's on hand, equipment, recipes, and (to co
 - Business logic goes in `app/Actions` (and pure helpers in `app/Support`), not in Filament classes.
 - Serve with `php artisan serve` and no `--port`; read the URL from its output. Stop servers you started. To click around without touching the dev data, migrate and seed a scratch SQLite file and serve with `DB_CONNECTION=sqlite DB_DATABASE=<file> php artisan serve --no-reload` (without `--no-reload` the server drops env vars so `.env` wins).
 - No custom Filament theme: Tailwind classes in Filament schemas aren't compiled.
-- Photos are kept on the default disk: `local` (`storage/app/private`) in development, `s3` in production (Laravel Forge, `league/flysystem-aws-s3-v3`). Livewire's temporary uploads always stay on `local` (`AppServiceProvider`) because the AI actions read photos from a local path (`getRealPath()`). Image columns and entries turn off `checkFileExistence()`, which would cost an S3 request per photo.
+- Photos are kept on the default disk: `local` (`storage/app/private`) in development, `s3` in production (Laravel Forge, `league/flysystem-aws-s3-v3`). Livewire's temporary uploads always stay on `local` (`AppServiceProvider`) because the AI actions read photos from a local path (`getRealPath()`). Image columns and entries turn off `checkFileExistence()`, which would cost an S3 request per photo. The `s3` disk has `throw` on: Livewire's `storeAs()` returns the path even when the write fails, so a failed upload would otherwise be saved as a photo that isn't there.
 
 ## Tests
 
