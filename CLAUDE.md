@@ -69,6 +69,7 @@ A kitchen assistant: ingredients, what's on hand, equipment, recipes, and (to co
 - Business logic goes in `app/Actions` (and pure helpers in `app/Support`), not in Filament classes.
 - Serve with `php artisan serve` and no `--port`; read the URL from its output. Stop servers you started. To click around without touching the dev data, migrate and seed a scratch SQLite file and serve with `DB_CONNECTION=sqlite DB_DATABASE=<file> php artisan serve --no-reload` (without `--no-reload` the server drops env vars so `.env` wins).
 - No custom Filament theme: Tailwind classes in Filament schemas aren't compiled.
+- Photos are kept on the default disk: `local` (`storage/app/private`) in development, `s3` in production (Laravel Forge, `league/flysystem-aws-s3-v3`). Livewire's temporary uploads always stay on `local` (`AppServiceProvider`) because the AI actions read photos from a local path (`getRealPath()`). Image columns and entries turn off `checkFileExistence()`, which would cost an S3 request per photo.
 
 ## Tests
 
@@ -177,6 +178,16 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Laravel can be deployed using [Laravel Cloud](https://cloud.laravel.com/), which is the fastest way to deploy and scale production Laravel applications.
 - Activate the `deploying-to-cloud` skill whenever deploying to Laravel Cloud, configuring Cloud environments or resources, using the Cloud CLI, or troubleshooting Cloud deployments.
 
+=== tests rules ===
+
+# Test Enforcement
+
+- Add or update tests for behavior and logic changes when a test provides meaningful regression coverage.
+- Pure copy, styling, and layout-only changes do not require new or updated tests.
+- When test coverage applies, run the affected tests and ensure they pass.
+- Test the changed behavior and its important failure modes, but do not add tests beyond them.
+- Read the `testing-best-practices` skill before writing tests.
+
 === laravel/core rules ===
 
 # Do Things the Laravel Way
@@ -224,6 +235,5 @@ This project has domain-specific skills available in `**/skills/**`. You MUST ac
 - Run the narrowest set of tests that covers the change. Pass a file path or `--filter=testName` to `php artisan test --compact`.
 - Rerun a test after each change to it.
 - Run `vendor/bin/pest` to call the test runner directly. It accepts the same file path and `--filter=testName` arguments.
-- After the feature tests pass, ask the user to run the complete suite with `php artisan test --compact`.
 
 </laravel-boost-guidelines>
