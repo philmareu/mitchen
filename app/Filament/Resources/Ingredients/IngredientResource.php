@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Ingredients;
 
 use App\Enums\IngredientCategory;
+use App\Enums\Sourcing;
 use App\Enums\StockLevel;
 use App\Filament\Resources\Ingredients\Pages\ManageIngredients;
 use App\Filament\Resources\InventoryItems\InventoryItemResource;
@@ -12,11 +13,13 @@ use App\Models\InventoryItem;
 use App\Support\Quantity;
 use App\Support\UnreadableQuantity;
 use BackedEnum;
+use Carbon\CarbonImmutable;
 use Closure;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
@@ -33,6 +36,7 @@ use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Str;
 
 class IngredientResource extends Resource
 {
@@ -83,10 +87,44 @@ class IngredientResource extends Resource
                 ->label('Always on hand')
                 ->helperText('Never tracked and never out, like tap water or ice. Recipes count it as there.')
                 ->columnSpanFull(),
+            Radio::make('sourcing')
+                ->label('Getting more')
+                ->options(Sourcing::class)
+                ->default(Sourcing::Grocery)
+                ->required()
+                ->live()
+                ->columnSpanFull(),
+            TextInput::make('lead_days')
+                ->label('How long it takes')
+                ->integer()
+                ->minValue(1)
+                ->maxValue(365)
+                ->suffix('days')
+                ->placeholder('3')
+                ->helperText('To get it in or make a batch. When it\'s out, recipes that need it are suggested as Plan ahead, with this much notice.')
+                ->visible(fn (Get $get): bool => (bool) self::sourcing($get)?->hasLeadDays())
+                ->columnSpanFull(),
+            Select::make('season')
+                ->label('In season')
+                ->multiple()
+                ->options(collect(range(1, 12))
+                    ->mapWithKeys(fn (int $month): array => [$month => CarbonImmutable::create(2000, $month, 1)->format('F')])
+                    ->all())
+                ->required()
+                ->helperText('The months it\'s in the stores. Out of season, recipes that need it are suggested as Plan ahead.')
+                ->visible(fn (Get $get): bool => self::sourcing($get) === Sourcing::Seasonal)
+                ->columnSpanFull(),
             Textarea::make('notes')
                 ->rows(2)
                 ->columnSpanFull(),
         ];
+    }
+
+    private static function sourcing(Get $get): ?Sourcing
+    {
+        $state = $get('sourcing');
+
+        return $state instanceof Sourcing ? $state : Sourcing::tryFrom((string) $state);
     }
 
     /**
@@ -149,6 +187,11 @@ class IngredientResource extends Resource
                         $record->is_core => 'None — restock',
                         default => 'None',
                     }),
+                TextColumn::make('sourcing')
+                    ->label('Getting more')
+                    ->state(fn (Ingredient $record): ?string => $record->sourcing === Sourcing::Grocery ? null : Str::ucfirst((string) $record->leadTime()))
+                    ->placeholder('Any store')
+                    ->toggleable(),
                 TextColumn::make('last_paid')
                     ->label('Last paid')
                     ->state(fn (Ingredient $record): ?string => $record->lastPaid?->formattedPrice())
@@ -161,6 +204,9 @@ class IngredientResource extends Resource
                     ->label('Core ingredients'),
                 SelectFilter::make('category')
                     ->options(IngredientCategory::class),
+                SelectFilter::make('sourcing')
+                    ->label('Getting more')
+                    ->options(Sourcing::class),
                 Filter::make('needs_restock')
                     ->label('Needs restock')
                     ->query(fn (IngredientBuilder $query) => $query->needsRestock()),

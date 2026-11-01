@@ -1,7 +1,9 @@
 <?php
 
+use App\Actions\AddRecipe;
 use App\Ai\Agents\RecipeReader;
 use App\Enums\IngredientCategory;
+use App\Enums\Readiness;
 use App\Enums\StorageLocation;
 use App\Filament\Resources\Recipes\Pages\CreateRecipe;
 use App\Filament\Resources\Recipes\Pages\EditRecipe;
@@ -14,7 +16,11 @@ use App\Models\InventoryItem;
 use App\Models\Recipe;
 use App\Models\RecipeIngredient;
 use App\Models\ShoppingListItem;
+use App\Support\RecipeDraft;
+use App\Support\RecipeLine;
+use App\Support\VariantDraft;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Support\Facades\Storage;
 use Laravel\Ai\Prompts\AgentPrompt;
 
@@ -54,20 +60,57 @@ function recipePageUrl(Recipe $recipe): string
     return RecipeResource::getUrl('view', ['record' => $recipe]);
 }
 
-it('lists recipes with what they are missing, and filters to the ones ready to cook', function () {
+it('lists recipes with what it takes to make them, in tabs', function () {
     $tortillas = tortillas();
     $toast = Recipe::factory()->create(['name' => 'Toast']);
+    $soup = Recipe::factory()->create(['name' => 'Leek soup']);
+    $soup->ingredients()->create(['name' => 'Leeks']);
 
     $this->get('/recipes')->assertOk();
 
-    livewire(ListRecipes::class)
-        ->assertCanSeeTableRecords([$tortillas, $toast])
-        ->assertTableColumnStateSet('ready', 'Missing 2', $tortillas)
-        ->assertTableColumnStateSet('ready', 'Ready to cook', $toast)
-        ->assertSeeHtml('href="'.e(recipePageUrl($tortillas)).'"')
-        ->filterTable('ready_to_cook')
+    $list = livewire(ListRecipes::class)
+        ->assertCanSeeTableRecords([$tortillas, $toast, $soup])
+        ->assertTableColumnStateSet('ready', Readiness::NeedsEquipment, $tortillas)
+        ->assertTableColumnHasDescription('ready', 'Tortilla press, Masa harina', $tortillas)
+        ->assertTableColumnStateSet('ready', Readiness::Ready, $toast)
+        ->assertTableColumnStateSet('ready', Readiness::QuickShop, $soup)
+        ->assertSeeHtml('href="'.e(recipePageUrl($tortillas)).'"');
+
+    expect(collect($list->instance()->getCachedTabs())->map(fn (Tab $tab): mixed => $tab->getBadge())->all())->toBe([
+        'all' => null,
+        'ready' => '1',
+        'quick_shop' => '1',
+        'big_shop' => null,
+        'plan_ahead' => null,
+        'needs_equipment' => '1',
+    ]);
+
+    $list->set('activeTab', 'ready')
         ->assertCanSeeTableRecords([$toast])
-        ->assertCanNotSeeTableRecords([$tortillas]);
+        ->assertCanNotSeeTableRecords([$tortillas, $soup])
+        ->set('activeTab', 'quick_shop')
+        ->assertCanSeeTableRecords([$soup])
+        ->assertCanNotSeeTableRecords([$tortillas, $toast]);
+});
+
+it('says on the recipe page what it takes, and what getting each ingredient takes', function () {
+    Ingredient::factory()->makeAhead(3)->create(['name' => 'Pickled red onions']);
+    $tacos = app(AddRecipe::class)->handle(new RecipeDraft(
+        name: 'Tacos',
+        ingredients: [new RecipeLine('Tortillas', '8'), new RecipeLine('Pickled red onions', '¼ cup'), new RecipeLine('Cilantro', 'a handful')],
+        variants: [new VariantDraft('Plain', [new RecipeLine('Pickled red onions', isLeftOut: true), new RecipeLine('Cilantro', isLeftOut: true)])],
+    ));
+    InventoryItem::factory()->for(Ingredient::query()->named('Tortillas')->sole())->create(['quantity' => 'a dozen']);
+
+    $this->get(recipePageUrl($tacos))
+        ->assertOk()
+        ->assertSee('Plan ahead: Pickled red onions (make ahead, about 3 days), Cilantro. Ready to cook as Plain.')
+        ->assertSeeInOrder(['Pickled red onions', 'make ahead, about 3 days', 'Out', 'Cilantro', 'Out']);
+
+    livewire(ViewRecipe::class, ['record' => $tacos->getRouteKey()])
+        ->callAction('variant', data: ['variant' => (string) $tacos->variants->sole()->id])
+        ->assertSee('Ready to cook.')
+        ->assertDontSee('Plan ahead');
 });
 
 it('adds a recipe by hand', function () {

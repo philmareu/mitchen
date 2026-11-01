@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Recipes;
 
+use App\Enums\Availability;
+use App\Enums\Readiness;
 use App\Filament\Resources\Equipment\EquipmentResource;
 use App\Filament\Resources\Recipes\Pages\CreateRecipe;
 use App\Filament\Resources\Recipes\Pages\EditRecipe;
@@ -9,7 +11,6 @@ use App\Filament\Resources\Recipes\Pages\ListRecipes;
 use App\Filament\Resources\Recipes\Pages\ViewRecipe;
 use App\Filament\Resources\Recipes\RelationManagers\CookLogsRelationManager;
 use App\Filament\Resources\Recipes\RelationManagers\VersionsRelationManager;
-use App\Models\Builders\RecipeBuilder;
 use App\Models\CookLog;
 use App\Models\Equipment;
 use App\Models\Ingredient;
@@ -46,14 +47,12 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Filters\Filter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
-use Illuminate\Support\Str;
 
 /**
  * The cook's recipes, with what's in the kitchen for each. Added by hand or read from a
@@ -510,11 +509,11 @@ class RecipeResource extends Resource
                     ->sortable()
                     ->description(fn (Recipe $record): ?string => $record->source),
                 TextColumn::make('ready')
-                    ->label('In the kitchen')
-                    ->state(fn (Recipe $record): string => ($count = count($record->missing())) === 0 ? 'Ready to cook' : "Missing {$count}")
+                    ->label('What it takes')
+                    ->state(fn (Recipe $record): Readiness => $record->closestShortfall()->readiness())
                     ->badge()
-                    ->color(fn (string $state): string => $state === 'Ready to cook' ? 'success' : 'warning')
-                    ->description(fn (Recipe $record): ?string => Str::limit(implode(', ', $record->missing()), 60) ?: null),
+                    ->description(fn (Recipe $record): ?string => $record->closestShortfall()->summary())
+                    ->wrap(),
                 TextColumn::make('cook_logs_max_cooked_on')
                     ->label('Last made')
                     ->date('M j, Y')
@@ -526,11 +525,6 @@ class RecipeResource extends Resource
                     ->placeholder('—')
                     ->sortable()
                     ->toggleable(),
-            ])
-            ->filters([
-                Filter::make('ready_to_cook')
-                    ->label('Ready to cook')
-                    ->query(fn (RecipeBuilder $query) => $query->readyToCook()),
             ])
             ->recordActions([
                 EditAction::make(),
@@ -591,8 +585,8 @@ class RecipeResource extends Resource
     }
 
     /**
-     * Under an ingredient: its note, whether it's optional or the variant's, and what to use
-     * instead.
+     * Under an ingredient: its note, whether it's optional or the variant's, what getting more
+     * takes when it's low or out, and what to use instead.
      */
     private static function lineDetails(RecipeIngredient $line, float $scale, ?RecipeVariant $variant): ?HtmlString
     {
@@ -601,6 +595,7 @@ class RecipeResource extends Resource
                 $line->note,
                 $line->is_optional ? 'optional' : null,
                 $variant !== null && $line->variant_id === $variant->id ? 'for '.$variant->name : null,
+                $line->availability() !== Availability::OnHand && $line->ingredient?->needsLeadTime() ? $line->ingredient->leadTime() : null,
             ])->filter()->join(' · '),
             ...$line->substitutes()->map(fn (RecipeSubstitute $substitute): string => 'Or '.$substitute->describe($scale)
                 .(filled($substitute->note) ? ' ('.$substitute->note.')' : '')),

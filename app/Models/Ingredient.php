@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use App\Enums\IngredientCategory;
+use App\Enums\Sourcing;
 use App\Enums\StockLevel;
 use App\Enums\Unit;
 use App\Models\Builders\IngredientBuilder;
 use App\Support\Quantity;
+use Carbon\CarbonImmutable;
+use Carbon\CarbonInterface;
 use Database\Factories\IngredientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
@@ -26,8 +29,13 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *
  * Some are always on hand and never tracked, like tap water: recipes count them as there.
  * Water and ice start out that way.
+ *
+ * Some take planning to get more of (Sourcing): hard to find, seasonal (in the stores the
+ * months in `season`) or made ahead, with `lead_days` for how long that takes.
+ *
+ * @property list<int>|null $season
  */
-#[Fillable(['name', 'category', 'is_core', 'always_on_hand', 'restock_point', 'notes'])]
+#[Fillable(['name', 'category', 'is_core', 'always_on_hand', 'sourcing', 'lead_days', 'season', 'restock_point', 'notes'])]
 #[UseEloquentBuilder(IngredientBuilder::class)]
 class Ingredient extends Model
 {
@@ -39,10 +47,27 @@ class Ingredient extends Model
      */
     private const array ALWAYS_ON_HAND = ['water', 'tap water', 'ice', 'ice water'];
 
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'sourcing' => 'grocery',
+    ];
+
     protected static function booted(): void
     {
         static::creating(function (Ingredient $ingredient): void {
             $ingredient->always_on_hand ??= in_array(mb_strtolower(trim($ingredient->name)), self::ALWAYS_ON_HAND, true);
+        });
+
+        static::saving(function (Ingredient $ingredient): void {
+            if (! $ingredient->sourcing->hasLeadDays()) {
+                $ingredient->lead_days = null;
+            }
+
+            if ($ingredient->sourcing !== Sourcing::Seasonal) {
+                $ingredient->season = null;
+            }
         });
     }
 
@@ -52,6 +77,8 @@ class Ingredient extends Model
             'category' => IngredientCategory::class,
             'is_core' => 'boolean',
             'always_on_hand' => 'boolean',
+            'sourcing' => Sourcing::class,
+            'lead_days' => 'integer',
             'restock_amount' => 'float',
             'restock_unit' => Unit::class,
             'restock_level' => StockLevel::class,
@@ -108,6 +135,107 @@ class Ingredient extends Model
         return $this->relationLoaded('shoppingListItems')
             ? $this->shoppingListItems->isNotEmpty()
             : $this->shoppingListItems()->exists();
+    }
+
+    /**
+     * Whether getting more takes planning on the day (today by default): a hard-to-find or
+     * made-ahead ingredient always does, a seasonal one when it's out of season.
+     */
+    public function needsLeadTime(?CarbonInterface $on = null): bool
+    {
+        return match ($this->sourcing) {
+            Sourcing::Grocery => false,
+            Sourcing::Seasonal => ! $this->isInSeason($on),
+            default => true,
+        };
+    }
+
+    /**
+     * Anything but a seasonal ingredient is always in season, and so is one with no months set.
+     */
+    public function isInSeason(?CarbonInterface $on = null): bool
+    {
+        return $this->sourcing !== Sourcing::Seasonal
+            || blank($this->season)
+            || in_array(($on ?? today())->month, $this->season, true);
+    }
+
+    /**
+     * What getting more takes, for a recipe that needs it: "make ahead, about 3 days",
+     * "hard to find", "in season Jun–Aug". Null for a grocery-store ingredient.
+     */
+    public function leadTime(): ?string
+    {
+        return match ($this->sourcing) {
+            Sourcing::Grocery => null,
+            Sourcing::Seasonal => blank($this->season) ? 'seasonal' : 'in season '.self::formatMonths($this->season),
+            default => mb_strtolower($this->sourcing->getLabel()).($this->lead_days ? ', about '.self::formatDays($this->lead_days) : ''),
+        };
+    }
+
+    /**
+     * "3 days", "a week", "3 weeks".
+     */
+    public static function formatDays(int $days): string
+    {
+        return match (true) {
+            $days === 1 => 'a day',
+            $days === 7 => 'a week',
+            $days % 7 === 0 => ($days / 7).' weeks',
+            default => $days.' days',
+        };
+    }
+
+    /**
+     * Months as runs, across the new year too: [6, 7, 8, 10] is "Jun–Aug, Oct", [12, 1, 2]
+     * "Dec–Feb".
+     *
+     * @param  list<int>  $months
+     */
+    public static function formatMonths(array $months): string
+    {
+        if (count(array_unique($months)) >= 12) {
+            return 'all year';
+        }
+
+        $name = fn (int $month): string => CarbonImmutable::create(2000, $month, 1)->format('M');
+        $next = fn (int $month): int => $month % 12 + 1;
+        $runs = [];
+
+        foreach (collect($months)->unique()->sort() as $month) {
+            if (in_array($month === 1 ? 12 : $month - 1, $months, true)) {
+                continue;
+            }
+
+            $last = $month;
+
+            while (in_array($next($last), $months, true)) {
+                $last = $next($last);
+            }
+
+            $runs[] = $last === $month ? $name($month) : $name($month).'–'.$name($last);
+        }
+
+        return implode(', ', $runs);
+    }
+
+    /**
+     * Months as a sorted list of numbers, whatever the form sends ("6" or 6).
+     *
+     * @return Attribute<list<int>|null, array<int|string>|null>
+     */
+    protected function season(): Attribute
+    {
+        return Attribute::make(
+            get: fn (?string $value): ?array => $value === null ? null : json_decode($value, true),
+            set: fn (?array $value): ?string => blank($value) ? null : json_encode(collect($value)
+                ->map(fn (int|string $month): int => (int) $month)
+                ->filter(fn (int $month): bool => $month >= 1 && $month <= 12)
+                ->unique()
+                ->sort()
+                ->values()
+                ->all()),
+        );
     }
 
     /**

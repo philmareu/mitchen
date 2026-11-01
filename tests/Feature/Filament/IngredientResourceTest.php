@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\IngredientCategory;
+use App\Enums\Sourcing;
 use App\Enums\StockLevel;
 use App\Filament\Resources\Ingredients\Pages\ManageIngredients;
 use App\Models\Ingredient;
@@ -72,4 +73,27 @@ it('filters to ingredients that need restocking', function () {
         ->filterTable('needs_restock')
         ->assertCanSeeTableRecords([$needed])
         ->assertCanNotSeeTableRecords([$stocked]);
+});
+
+it('says what getting more takes: days for one made ahead, months for a seasonal one', function () {
+    $onions = Ingredient::factory()->create(['name' => 'Pickled red onions']);
+    $peaches = Ingredient::factory()->create(['name' => 'Peaches']);
+
+    livewire(ManageIngredients::class)
+        ->callAction(TestAction::make('edit')->table($peaches), data: ['sourcing' => Sourcing::Seasonal])
+        ->assertHasFormErrors(['season' => 'required']);
+
+    livewire(ManageIngredients::class)
+        ->callAction(TestAction::make('edit')->table($onions), data: ['sourcing' => Sourcing::MakeAhead, 'lead_days' => 3])
+        ->assertHasNoFormErrors()
+        ->callAction(TestAction::make('edit')->table($peaches), data: ['sourcing' => Sourcing::Seasonal, 'season' => ['6', '7', '8']])
+        ->assertHasNoFormErrors()
+        ->assertTableColumnStateSet('sourcing', 'Make ahead, about 3 days', $onions)
+        ->assertTableColumnStateSet('sourcing', 'In season Jun–Aug', $peaches)
+        ->filterTable('sourcing', Sourcing::MakeAhead->value)
+        ->assertCanSeeTableRecords([$onions])
+        ->assertCanNotSeeTableRecords([$peaches]);
+
+    expect($onions->fresh())->sourcing->toBe(Sourcing::MakeAhead)->lead_days->toBe(3)
+        ->and($peaches->fresh()->season)->toBe([6, 7, 8]);
 });

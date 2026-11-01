@@ -6,6 +6,7 @@ use App\Actions\AddRecipe;
 use App\Actions\UpdateRecipe;
 use App\Enums\EquipmentCategory;
 use App\Enums\IngredientCategory as Category;
+use App\Enums\Sourcing;
 use App\Enums\StorageLocation as Location;
 use App\Models\Equipment;
 use App\Models\Ingredient;
@@ -23,8 +24,10 @@ use Illuminate\Database\Seeder;
  * A lived-in kitchen to click around: staples at every stock level, a few
  * one-off ingredients, some core items that need restocking (one by its own
  * restock point), a short shopping list, a few past shops with prices, some
- * equipment (without photos) and a few recipes: one with a substitute and a
- * variant, one with variants, and one with a cook log and a second version.
+ * equipment (without photos), a few ingredients that take planning to get, and
+ * recipes at every stage from ready to cook to needing equipment: one with a
+ * substitute and a variant, one with variants, and one with a cook log and a
+ * second version.
  */
 class DemoKitchenSeeder extends Seeder
 {
@@ -81,7 +84,30 @@ class DemoKitchenSeeder extends Seeder
 
         $this->purchaseHistory();
         $this->equipment();
+        $this->leadTimes();
         $this->recipes();
+    }
+
+    /**
+     * Ingredients that take planning to get more of.
+     */
+    private function leadTimes(): void
+    {
+        // [name, category, sourcing, lead days, months in season]
+        $ingredients = [
+            ['Gochujang', Category::OilsAndCondiments, Sourcing::HardToFind, 5, null],
+            ['Pickled red onions', Category::CannedAndJarred, Sourcing::MakeAhead, 3, null],
+            ['Blueberries', Category::Produce, Sourcing::Seasonal, null, [6, 7, 8]],
+        ];
+
+        foreach ($ingredients as [$name, $category, $sourcing, $leadDays, $season]) {
+            Ingredient::updateOrCreate(['name' => $name], [
+                'category' => $category,
+                'sourcing' => $sourcing,
+                'lead_days' => $leadDays,
+                'season' => $season,
+            ]);
+        }
     }
 
     private function equipment(): void
@@ -111,7 +137,8 @@ class DemoKitchenSeeder extends Seeder
     }
 
     /**
-     * Two recipes ready to cook and two missing things, one of them handwritten-card style.
+     * Recipes ready to cook, a quick shop away (salsa, tortillas), a bigger shop away (the
+     * stew), and one to plan ahead for (tacos with homemade pickled onions).
      */
     private function recipes(): void
     {
@@ -232,6 +259,25 @@ class DemoKitchenSeeder extends Seeder
                     'Stir everything together.',
                     'Let it sit 15 minutes, then taste for salt.',
                 ],
+            ),
+            new RecipeDraft(
+                name: 'Black bean tacos',
+                servings: 4,
+                ingredients: [
+                    new RecipeLine('Black beans', '1 can', 'drained', category: Category::CannedAndJarred),
+                    new RecipeLine('Ground cumin', '1 tsp'),
+                    new RecipeLine('Corn tortillas', '8', category: Category::Bakery),
+                    new RecipeLine('Pickled red onions', '½ cup'),
+                    new RecipeLine('Cotija', '¼ cup', 'crumbled', isOptional: true, category: Category::DairyAndEggs),
+                    new RecipeLine('Limes', '1', 'in wedges', category: Category::Produce),
+                ],
+                equipment: ['Cast iron skillet'],
+                steps: [
+                    'Warm the beans with the cumin and a splash of water, mashing a few.',
+                    'Char the tortillas in the dry skillet.',
+                    'Fill with the beans, pickled onions and cotija, with lime to squeeze over.',
+                ],
+                notes: 'The pickled onions take 3 days: make a jar the weekend before.',
             ),
         ];
 
