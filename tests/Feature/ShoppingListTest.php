@@ -53,6 +53,14 @@ it('keeps one entry per thing still to buy', function () {
         ->and(ShoppingListItem::count())->toBe(2);
 });
 
+it('keeps one entry when the same thing is added in the singular', function () {
+    $limes = app(AddToShoppingList::class)->handle('Limes');
+
+    app(AddToShoppingList::class)->handle('lime', '4');
+
+    expect(ShoppingListItem::sole())->id->toBe($limes->id)->quantity->toBe('4');
+});
+
 it('brings in the restock list without repeating what is already there', function () {
     $milk = Ingredient::factory()->core()->has(InventoryItem::factory()->level(StockLevel::Out))->create(['name' => 'Milk']);
     $rice = Ingredient::factory()->core()->create(['name' => 'Rice']);

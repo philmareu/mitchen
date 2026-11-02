@@ -144,6 +144,17 @@ it('takes what it bought out of the cart so it is not put away twice', function 
     expect($towels->fresh()->bought_at)->not->toBeNull();
 });
 
+it('restocks the catalog\'s plural and takes it out of the cart when the cook writes the singular', function () {
+    $limes = Ingredient::factory()->core()->create(['name' => 'Limes']);
+    $inTheCart = ShoppingListItem::factory()->bought()->create(['name' => 'Limes']);
+
+    app(ApplyKitchenUpdate::class)->handle([change(['ingredient' => 'lime', 'quantity' => '6', 'location' => 'counter'])]);
+
+    expect(Ingredient::sole()->id)->toBe($limes->id)
+        ->and((string) $limes->inventoryItems()->sole()->quantity)->toBe('6');
+    $this->assertModelMissing($inTheCart);
+});
+
 it('uses up core and one-off ingredients by their own rules', function () {
     $milk = InventoryItem::factory()->for(Ingredient::factory()->core()->state(['name' => 'Milk']))->create();
     $basil = InventoryItem::factory()->for(Ingredient::factory()->state(['name' => 'Fresh basil']))->create();

@@ -22,7 +22,7 @@ class AddToShoppingList
 
         $entry = ShoppingListItem::query()
             ->toBuy()
-            ->whereRaw('lower(name) = ?', [mb_strtolower($name)])
+            ->named($name)
             ->first()
             ?? new ShoppingListItem(['name' => $name, 'category' => $category ?? IngredientCategory::Other]);
 
