@@ -39,6 +39,7 @@ it('sends the photos in order', function () {
 
 it('tidies the answer, taking catalog and equipment spellings', function () {
     Ingredient::factory()->create(['name' => 'Kosher salt']);
+    Ingredient::factory()->create(['name' => 'Limes']);
     Equipment::factory()->create(['name' => 'Cast iron skillet']);
 
     RecipeReader::fake([readerRecipe([
@@ -83,7 +84,7 @@ it('tidies the answer, taking catalog and equipment spellings', function () {
         ->isOptional->toBeFalse()
         ->category->toBe(IngredientCategory::Other);
 
-    expect($lime)->isOptional->toBeTrue();
+    expect($lime)->name->toBe('Limes')->isOptional->toBeTrue();
 });
 
 it('finds no recipe in an empty answer, and names one that has no name', function () {

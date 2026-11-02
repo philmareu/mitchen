@@ -155,6 +155,26 @@ it('reads what is needed onto the shopping list', function () {
         ->and($needTowels->ingredient)->toBe('Paper towels');
 });
 
+it('matches the singular or plural of a name to the catalog and the shopping list', function () {
+    $limes = Ingredient::factory()->create(['name' => 'Limes']);
+    $item = InventoryItem::factory()->for($limes)->create(['quantity' => '7', 'location' => StorageLocation::Counter]);
+    $towels = ShoppingListItem::factory()->create(['name' => 'Paper towels']);
+
+    KitchenUpdateReader::fake([[
+        'changes' => [
+            readerChange(['kind' => 'set', 'ingredient' => 'lime', 'inventory_item_id' => $item->id, 'quantity' => '3', 'location' => 'counter']),
+            readerChange(['ingredient' => 'paper towel', 'quantity' => '2', 'category' => 'other']),
+        ],
+        'bought_from_list' => [],
+        'not_understood' => [],
+    ]]);
+
+    $update = app(ReadKitchenUpdate::class)->handle('3 limes left, got paper towel');
+
+    expect($update->changes[0])->ingredient->toBe('Limes')->inventoryItemId->toBe($item->id)
+        ->and($update->boughtFromList)->toBe([$towels->id]);
+});
+
 it('ticks off shopping list entries that were bought', function () {
     $milk = Ingredient::factory()->create(['name' => 'Milk']);
     $milkEntry = ShoppingListItem::factory()->create(['name' => 'Milk']);

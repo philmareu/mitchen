@@ -9,6 +9,7 @@ use App\Models\Ingredient;
 use App\Models\InventoryItem;
 use App\Models\ShoppingListItem;
 use App\Support\KitchenUpdate;
+use App\Support\Names;
 use App\Support\ProposedChange;
 use App\Support\PurchaseDetails;
 use Carbon\CarbonImmutable;
@@ -96,14 +97,14 @@ class PrepareKitchenChanges
     {
         $bought = collect($changes)
             ->filter(fn (ProposedChange $change): bool => $change->kind === ChangeKind::Bought)
-            ->map(fn (ProposedChange $change): string => mb_strtolower($change->ingredient));
+            ->map(fn (ProposedChange $change): string => $change->ingredient);
 
         return ShoppingListItem::query()
             ->toBuy()
             ->with('ingredient')
             ->get()
             ->filter(fn (ShoppingListItem $entry): bool => in_array($entry->id, $ids, true)
-                || $bought->contains(mb_strtolower($entry->ingredient->name ?? $entry->name)))
+                || $bought->contains(fn (string $name): bool => Names::same($name, $entry->ingredient->name ?? $entry->name)))
             ->modelKeys();
     }
 }

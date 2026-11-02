@@ -13,6 +13,7 @@ use App\Models\InventoryItem;
 use App\Models\ShoppingListItem;
 use App\Models\Store;
 use App\Support\KitchenUpdate;
+use App\Support\Names;
 use App\Support\ProposedChange;
 use App\Support\PurchaseDetails;
 use Carbon\CarbonImmutable;
@@ -46,7 +47,7 @@ class ReadKitchenUpdate
             attachments: array_map(fn (string $path): LocalImage => Image::fromPath($path), $photos),
         );
 
-        $catalog = $ingredients->keyBy(fn (Ingredient $ingredient): string => mb_strtolower($ingredient->name));
+        $catalog = $ingredients->keyBy('id');
         $items = $ingredients->flatMap->inventoryItems->keyBy('id');
 
         $changes = collect($this->list($response['changes'] ?? null))
@@ -72,7 +73,7 @@ class ReadKitchenUpdate
 
     /**
      * @param  array<string, mixed>  $change
-     * @param  BaseCollection<string, Ingredient>  $catalog
+     * @param  BaseCollection<int, Ingredient>  $catalog  By id.
      * @param  BaseCollection<int, InventoryItem>  $items
      */
     private function change(array $change, BaseCollection $catalog, BaseCollection $items): ?ProposedChange
@@ -84,7 +85,7 @@ class ReadKitchenUpdate
             return null;
         }
 
-        $ingredient = $catalog->get(mb_strtolower($name));
+        $ingredient = $this->inCatalog($name, $catalog);
 
         $item = in_array($kind, [ChangeKind::Bought, ChangeKind::Need], true) ? null : $items->get((int) ($change['inventory_item_id'] ?? 0));
 
@@ -145,11 +146,11 @@ class ReadKitchenUpdate
 
         $bought = collect($changes)
             ->filter(fn (ProposedChange $change): bool => $change->kind === ChangeKind::Bought)
-            ->map(fn (ProposedChange $change): string => mb_strtolower($change->ingredient));
+            ->map(fn (ProposedChange $change): string => $change->ingredient);
 
         return $shoppingList
             ->filter(fn (ShoppingListItem $entry): bool => in_array($entry->id, $ids, true)
-                || $bought->contains(mb_strtolower($entry->ingredient->name ?? $entry->name)))
+                || $bought->contains(fn (string $name): bool => Names::same($name, $entry->ingredient->name ?? $entry->name)))
             ->map(fn (ShoppingListItem $entry): int => $entry->id)
             ->values()
             ->all();
@@ -160,14 +161,14 @@ class ReadKitchenUpdate
      * the subject of any change in this update.
      *
      * @param  list<ProposedChange>  $changes
-     * @param  BaseCollection<string, Ingredient>  $catalog
+     * @param  BaseCollection<int, Ingredient>  $catalog  By id.
      * @param  BaseCollection<int, InventoryItem>  $items
      * @return list<int>
      */
     private function notSeen(mixed $ids, array $changes, BaseCollection $catalog, BaseCollection $items): array
     {
         $changed = collect($changes)
-            ->map(fn (ProposedChange $change): ?int => $catalog->get(mb_strtolower($change->ingredient))?->id)
+            ->map(fn (ProposedChange $change): ?int => $this->inCatalog($change->ingredient, $catalog)?->id)
             ->filter();
 
         return collect($this->ids($ids))
@@ -214,6 +215,18 @@ class ReadKitchenUpdate
         } catch (Throwable) {
             return null;
         }
+    }
+
+    /**
+     * The catalog ingredient of that name, matched like IngredientBuilder::named().
+     *
+     * @param  BaseCollection<int, Ingredient>  $catalog  By id.
+     */
+    private function inCatalog(string $name, BaseCollection $catalog): ?Ingredient
+    {
+        $id = Names::search($name, $catalog->map(fn (Ingredient $ingredient): string => $ingredient->name));
+
+        return $id === null ? null : $catalog->get($id);
     }
 
     /**

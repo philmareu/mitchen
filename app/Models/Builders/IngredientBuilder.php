@@ -3,6 +3,7 @@
 namespace App\Models\Builders;
 
 use App\Models\Ingredient;
+use App\Support\Names;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
@@ -11,11 +12,12 @@ use Illuminate\Database\Eloquent\Builder;
 class IngredientBuilder extends Builder
 {
     /**
-     * The ingredient with this name, ignoring case and surrounding spaces.
+     * The ingredient with this name, ignoring case, surrounding spaces and singular or plural
+     * ("lime" is "Limes"; see Names). Matched in PHP: one kitchen's catalog is small.
      */
     public function named(string $name): static
     {
-        return $this->whereRaw('lower(name) = ?', [mb_strtolower(trim($name))]);
+        return $this->whereKey(Names::search($name, (clone $this)->pluck('name', 'id')) ?? []);
     }
 
     public function core(): static

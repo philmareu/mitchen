@@ -6,6 +6,7 @@ use App\Ai\Agents\RecipeReader;
 use App\Enums\IngredientCategory;
 use App\Models\Equipment;
 use App\Models\Ingredient;
+use App\Support\Names;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
 use App\Support\SubstituteDraft;
@@ -18,7 +19,7 @@ use Laravel\Ai\Files\LocalImage;
 
 /**
  * Asks the assistant for the recipe in the photos or note, then tidies its answer: names
- * that match the catalog or the kitchen's equipment (ignoring case) take their spelling,
+ * that match the catalog or the kitchen's equipment (ignoring case, singular or plural) take their spelling,
  * servings that aren't a positive number are dropped, empty lines are skipped, and substitutes
  * for an ingredient the recipe doesn't have are dropped.
  */
@@ -157,14 +158,15 @@ class ReadRecipe
     }
 
     /**
-     * The listed name it matches, ignoring case, else the name in sentence case.
+     * The listed name it matches, ignoring case, singular or plural (Names), else the name in sentence case.
      *
      * @param  Collection<int, string>  $names
      */
     private function spelledAs(string $name, Collection $names): string
     {
-        return $names->first(fn (string $listed): bool => mb_strtolower($listed) === mb_strtolower($name))
-            ?? Str::ucfirst($name);
+        $key = Names::search($name, $names);
+
+        return $key === null ? Str::ucfirst($name) : $names[$key];
     }
 
     private function text(mixed $value): ?string

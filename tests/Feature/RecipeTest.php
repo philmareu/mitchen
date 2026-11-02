@@ -47,6 +47,17 @@ it('links ingredient lines to the catalog, adding new ones as one-offs', functio
         ->and(Ingredient::count())->toBe(2);
 });
 
+it('links a line to the catalog ingredient that is its singular or plural', function () {
+    $limes = stock('Limes', '7', StorageLocation::Counter);
+    $recipe = Recipe::factory()->create();
+
+    $line = $recipe->ingredients()->create(['name' => 'Lime', 'quantity' => 'juice of 1']);
+
+    expect($line)->ingredient_id->toBe($limes->id)->name->toBe('Limes')
+        ->and($line->availability())->toBe(Availability::OnHand)
+        ->and(Ingredient::count())->toBe(1);
+});
+
 it('links equipment the kitchen has, and links up when it gets one', function () {
     $skillet = Equipment::factory()->create(['name' => 'Cast iron skillet']);
     $recipe = Recipe::factory()->create();

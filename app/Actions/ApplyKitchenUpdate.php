@@ -7,6 +7,7 @@ use App\Enums\StockLevel;
 use App\Models\Ingredient;
 use App\Models\InventoryItem;
 use App\Models\ShoppingListItem;
+use App\Support\Names;
 use App\Support\ProposedChange;
 use App\Support\PurchaseDetails;
 use App\Support\Quantity;
@@ -65,7 +66,7 @@ class ApplyKitchenUpdate
     {
         $bought = collect($changes)
             ->filter(fn (ProposedChange $change): bool => $change->kind === ChangeKind::Bought)
-            ->map(fn (ProposedChange $change): string => mb_strtolower(trim($change->ingredient)));
+            ->map(fn (ProposedChange $change): string => $change->ingredient);
 
         if ($bought->isEmpty()) {
             return [];
@@ -75,7 +76,7 @@ class ApplyKitchenUpdate
             ->bought()
             ->with('ingredient')
             ->get()
-            ->filter(fn (ShoppingListItem $entry): bool => $bought->contains(mb_strtolower($entry->ingredient->name ?? $entry->name)))
+            ->filter(fn (ShoppingListItem $entry): bool => $bought->contains(fn (string $name): bool => Names::same($name, $entry->ingredient->name ?? $entry->name)))
             ->modelKeys();
     }
 

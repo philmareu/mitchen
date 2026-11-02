@@ -153,6 +153,25 @@ it('saves what the cook bought, used and needs', function () {
     expect(ShoppingListItem::query()->pluck('name')->all())->toBe(['Paper towels']);
 });
 
+it('saves a singular or plural under the catalog\'s name and takes it off the list', function () {
+    $limes = Ingredient::factory()->core()->create(['name' => 'Limes']);
+    $item = InventoryItem::factory()->for($limes)->level(StockLevel::Out)->create(['location' => StorageLocation::Counter]);
+    $towels = ShoppingListItem::factory()->create(['name' => 'Paper towels']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateKitchen::class, [
+            'changes' => [
+                ['kind' => 'bought', 'ingredient' => 'lime', 'quantity' => '6'],
+                ['kind' => 'bought', 'ingredient' => 'paper towel', 'quantity' => '2'],
+            ],
+        ])
+        ->assertOk();
+
+    expect($item->fresh()->quantity->format())->toBe('6')
+        ->and(Ingredient::query()->pluck('name')->all())->toEqualCanonicalizing(['Limes', 'Paper towel']);
+    $this->assertModelMissing($towels);
+});
+
 it('ignores an item id that belongs to another ingredient', function () {
     $butter = Ingredient::factory()->create(['name' => 'Butter']);
     $stick = InventoryItem::factory()->for($butter)->create(['quantity' => '2 sticks', 'location' => StorageLocation::Fridge]);
