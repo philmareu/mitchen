@@ -26,6 +26,7 @@ Your recipes live alongside it, so each one shows what's on hand, what's missing
 - **Recipes that get better.** Press *Made it* to log a batch: how it turned out and what to change next time, even days later (pickles taste right on day three). *Update from notes* has Claude work your notes into the recipe ("more salt, less vinegar" becomes `1½ tsp` salt and `¾ cup` vinegar); you check it and it's saved as a new version. Every change keeps the old version, with what changed.
 - **Substitutes and variants.** A substitute stands in for one ingredient when you're out (no buttermilk: milk and lemon juice), so the recipe still counts as ready to cook. A variant is a way of making it you pick up front (mild or hot salsa, blueberry pancakes), and the ingredients and shopping list follow it. Quick add reads both off the card.
 - **AI usage and cost.** Every call to Claude is logged with its model, tokens, time and estimated cost, with this month's and all-time spend at a glance.
+- **Ask Claude about your kitchen.** Mitchen is an MCP server, so you can connect it to the Claude app and ask from the counter: what can I make tonight, what's on the shopping list, what should I use up? Tell it what you bought or finished and it reads the changes back, saving them once you agree.
 
 ## Getting started
 
@@ -46,6 +47,16 @@ For a real install, skip `--seed` and create your own login with `php artisan ma
 Photos (recipe cards and equipment) are kept privately in `storage/app/private`. To keep them on S3 instead, set `FILESYSTEM_DISK=s3` and the `AWS_*` values, and give the bucket a CORS rule allowing `GET` from your app's URL so the photo fields and editor can load them.
 
 Quick update and photo reading use the [Laravel AI SDK](https://github.com/laravel/ai) with Anthropic. Set `ANTHROPIC_API_KEY` in `.env` to turn them on; everything else works without it. Typed notes run on the fast model (`ANTHROPIC_FAST_MODEL`, Claude Haiku by default) and photos on your main model (`ANTHROPIC_MODEL`). Cost estimates use the rates in `config/ai.php`; on Claude Sonnet a receipt costs about a cent and a shelf photo about three.
+
+## Connecting Claude
+
+Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list), using the same actions as the app. Claude does the understanding on its side, so these calls don't use your `ANTHROPIC_API_KEY`.
+
+Clients sign in with OAuth through [Laravel Passport](https://laravel.com/docs/passport):
+
+1. Run `php artisan passport:keys` once on the server (or set `PASSPORT_PRIVATE_KEY` and `PASSPORT_PUBLIC_KEY`). The keys go in `storage/`, so with zero-downtime deploys (Forge) they carry over between releases.
+2. In Claude, add a custom connector (Settings → Connectors) with your app's URL plus `/mcp`, such as `https://mitchen.example.com/mcp`.
+3. Connect: sign in to Mitchen and approve. The connector is then available in the Claude apps too.
 
 ## How quantities work
 
@@ -79,6 +90,7 @@ Units cover weights, volumes and the containers food comes in (jar, can, bottle,
 - [x] Stores and purchase history with prices
 - [ ] Price comparison across stores, and choosing a store per shopping list item
 - [x] AI usage and cost tracking
+- [x] An MCP server, so Claude can read and update the kitchen
 - [ ] More AI: recipes from the web, and meal ideas from what's on hand
 
 ## Development
