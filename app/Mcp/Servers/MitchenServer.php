@@ -2,11 +2,13 @@
 
 namespace App\Mcp\Servers;
 
+use App\Mcp\Tools\AddRecipe;
 use App\Mcp\Tools\AddToShoppingList;
 use App\Mcp\Tools\GetRecipe;
 use App\Mcp\Tools\GetShoppingList;
 use App\Mcp\Tools\ListEquipment;
 use App\Mcp\Tools\ListInventory;
+use App\Mcp\Tools\LogCook;
 use App\Mcp\Tools\RemoveFromShoppingList;
 use App\Mcp\Tools\RestockList;
 use App\Mcp\Tools\UpdateKitchen;
@@ -27,6 +29,7 @@ use Laravel\Mcp\Server\Attributes\Version;
     - Places: pantry, fridge, freezer, spice_rack, counter.
     - To change what's on hand or the shopping list, work out the changes, read them back to the cook as a short list, and call `update-kitchen` once they agree. Nothing changes until then. Use the catalog's names (`list-inventory`); a new name is added as a one-off ingredient.
     - `what-to-cook` says how close each recipe is with what's in the kitchen; `get-recipe` gives one recipe with what's on hand for each ingredient, scaled or made as a variant.
+    - `add-recipe` saves a recipe from a web page, a pasted recipe or a photo of a card, copied as written; read it back first, like kitchen changes. After the cook makes something, offer to log it with `log-cook`, with how it turned out and what to change next time.
     - Dates use the YYYY-MM-DD format.
     MARKDOWN)]
 class MitchenServer extends Server
@@ -42,6 +45,8 @@ class MitchenServer extends Server
         UpdateKitchen::class,
         AddToShoppingList::class,
         RemoveFromShoppingList::class,
+        AddRecipe::class,
+        LogCook::class,
     ];
 
     protected array $resources = [

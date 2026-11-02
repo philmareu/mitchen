@@ -3,6 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Enums\Availability;
+use App\Filament\Resources\Recipes\RecipeResource;
 use App\Models\CookLog;
 use App\Models\Recipe;
 use App\Models\RecipeEquipment;
@@ -18,7 +19,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('One recipe, by id (from what-to-cook) or name: its ingredients with what\'s on hand for each (on_hand, low or out, where it is, and a substitute on hand when it\'s out), substitutes, variants, equipment and whether the kitchen has it, steps, and the latest cook log notes. Pass variant to make it a variant\'s way, and scale to halve or double it: amounts Mitchen can read are scaled, "a pinch" stays a pinch.')]
+#[Description('One recipe, by id (from what-to-cook) or name: its ingredients with what\'s on hand for each (on_hand, low or out, where it is, and a substitute on hand when it\'s out), substitutes, variants, equipment and whether the kitchen has it, steps, the latest cook log entries, and a link to its page in Mitchen. Pass variant to make it a variant\'s way, and scale to halve or double it: amounts Mitchen can read are scaled, "a pinch" stays a pinch.')]
 #[IsReadOnly]
 class GetRecipe extends Tool
 {
@@ -79,6 +80,7 @@ class GetRecipe extends Tool
         return [
             'id' => $recipe->id,
             'name' => $recipe->name,
+            'url' => RecipeResource::getUrl('view', ['record' => $recipe]),
             'source' => $recipe->source,
             'servings' => $recipe->servings,
             'scale' => $scale,
@@ -113,6 +115,7 @@ class GetRecipe extends Tool
             'steps' => $recipe->steps ?? [],
             'notes' => $recipe->notes,
             'cook_log' => $recipe->cookLogs()->limit(3)->get()->map(fn (CookLog $log): array => [
+                'id' => $log->id,
                 'cooked_on' => $log->cooked_on->toDateString(),
                 'variant' => $log->variant,
                 'thoughts' => $log->thoughts,
