@@ -35,4 +35,12 @@ class InventoryItemBuilder extends Builder
     {
         return $this->whereIn('stock_level', [StockLevel::Low, StockLevel::Out]);
     }
+
+    /**
+     * Items to use soon: something left, with a use-by date within this many days (or past).
+     */
+    public function useSoon(int $days = 7): static
+    {
+        return $this->notOut()->whereDate('expires_on', '<=', today()->addDays($days));
+    }
 }

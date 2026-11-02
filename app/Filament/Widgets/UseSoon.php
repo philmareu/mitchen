@@ -2,7 +2,6 @@
 
 namespace App\Filament\Widgets;
 
-use App\Enums\StockLevel;
 use App\Filament\Resources\InventoryItems\InventoryItemResource;
 use App\Models\InventoryItem;
 use Filament\Support\Icons\Heroicon;
@@ -32,10 +31,7 @@ class UseSoon extends TableWidget
         return $table
             ->query(fn (): Builder => InventoryItem::query()
                 ->with('ingredient')
-                ->whereDate('expires_on', '<=', today()->addDays(7))
-                ->where(fn (Builder $query) => $query
-                    ->whereNull('stock_level')
-                    ->orWhere('stock_level', '!=', StockLevel::Out)))
+                ->useSoon())
             ->defaultSort('expires_on')
             ->paginated([10, 25, 50])
             ->emptyStateIcon(Heroicon::OutlinedCalendarDays)
