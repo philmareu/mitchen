@@ -129,7 +129,8 @@ it('lists the equipment, by name or kind', function () {
         ->tool(ListEquipment::class, ['search' => 'pan'])
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json) => $json
-            ->where('equipment', fn ($pieces) => collect($pieces)->pluck('name')->all() === ['Half sheet pan']));
+            ->where('equipment', fn ($pieces) => collect($pieces)->pluck('name')->all() === ['Half sheet pan'])
+            ->etc());
 
     MitchenServer::actingAs($this->cook)
         ->tool(ListEquipment::class, ['category' => 'cookware'])
@@ -140,7 +141,8 @@ it('lists the equipment, by name or kind', function () {
                 ->where('brand', 'Lodge')
                 ->where('size', '10 in')
                 ->where('count', 1)
-                ->etc()));
+                ->etc())
+            ->etc());
 });
 
 it('saves a recipe in the catalog\'s names, adding what\'s new', function () {

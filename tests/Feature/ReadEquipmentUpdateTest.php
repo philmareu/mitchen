@@ -5,6 +5,7 @@ use App\Ai\Agents\EquipmentReader;
 use App\Enums\EquipmentCategory;
 use App\Enums\EquipmentChangeKind;
 use App\Models\Equipment;
+use App\Models\Recipe;
 use Illuminate\Http\UploadedFile;
 use Laravel\Ai\Prompts\AgentPrompt;
 
@@ -32,7 +33,20 @@ it('sends the photos in order', function () {
     EquipmentReader::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->attachments->count() === 2
         && $prompt->contains('(no note, just the photos)')
         && $prompt->contains('Photos attached: 2')
-        && $prompt->contains('(nothing listed yet)'));
+        && $prompt->contains('(nothing listed yet)')
+        && $prompt->contains("Equipment the recipes call for that isn't listed:\n(none)"));
+});
+
+it('sends what the recipes call for that is not listed, so it is named the same', function () {
+    Equipment::factory()->create(['name' => 'Stand mixer']);
+    Recipe::factory()->create(['name' => 'Salsa'])->equipment()->create(['name' => 'Blender']);
+    Recipe::factory()->create(['name' => 'Guacamole'])->equipment()->createMany([['name' => 'blender'], ['name' => 'Stand mixer']]);
+
+    EquipmentReader::fake([['pieces' => [], 'not_understood' => []]]);
+
+    app(ReadEquipmentUpdate::class)->handle('got a blender');
+
+    EquipmentReader::assertPrompted(fn (AgentPrompt $prompt): bool => str_ends_with($prompt->prompt, "Equipment the recipes call for that isn't listed:\n- Blender (Guacamole, Salsa)"));
 });
 
 it('turns the answer into pieces checked against what is listed', function () {

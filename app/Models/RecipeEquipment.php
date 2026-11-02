@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Builders\RecipeEquipmentBuilder;
 use Database\Factories\RecipeEquipmentFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Attributes\UseEloquentBuilder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * have one it stays unlinked until a piece of that name is added.
  */
 #[Fillable(['name', 'sort'])]
+#[UseEloquentBuilder(RecipeEquipmentBuilder::class)]
 class RecipeEquipment extends Model
 {
     /** @use HasFactory<RecipeEquipmentFactory> */

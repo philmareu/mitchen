@@ -2,6 +2,7 @@
 
 namespace App\Mcp\Tools\Concerns;
 
+use App\Models\Equipment;
 use App\Models\Ingredient;
 use App\Models\InventoryItem;
 use App\Models\ShoppingListItem;
@@ -39,6 +40,21 @@ trait PresentsKitchen
             'quantity' => $item->quantity->format() ?: 'some',
             'location' => $item->location->value,
             'use_by' => $item->expires_on?->toDateString(),
+        ];
+    }
+
+    /**
+     * @return array{name: string, category: string|null, brand: string|null, size: string|null, count: int, notes: string|null}
+     */
+    protected function presentEquipment(Equipment $piece): array
+    {
+        return [
+            'name' => $piece->name,
+            'category' => $piece->category?->value,
+            'brand' => $piece->brand,
+            'size' => $piece->size,
+            'count' => $piece->count,
+            'notes' => $piece->notes,
         ];
     }
 

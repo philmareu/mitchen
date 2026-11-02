@@ -6,6 +6,7 @@ use App\Ai\Agents\EquipmentReader;
 use App\Enums\EquipmentCategory;
 use App\Enums\EquipmentChangeKind;
 use App\Models\Equipment;
+use App\Models\RecipeEquipment;
 use App\Support\EquipmentUpdate;
 use App\Support\ProposedEquipment;
 use Illuminate\Database\Eloquent\Collection;
@@ -15,8 +16,9 @@ use Laravel\Ai\Files\Image;
 use Laravel\Ai\Files\LocalImage;
 
 /**
- * Asks the assistant what's in the photos or note, then checks its answer against the
- * equipment already listed: ids it invents are dropped (an unknown piece "already had" is
+ * Asks the assistant what's in the photos or note, telling it what the recipes call for that
+ * isn't listed so it names those pieces the way the recipes do, then checks its answer against
+ * the equipment already listed: ids it invents are dropped (an unknown piece "already had" is
  * new, an unknown piece "gone" is nothing to remove), listed pieces keep their name and
  * category, and photo numbers that weren't attached are ignored.
  */
@@ -135,6 +137,11 @@ class ReadEquipmentUpdate
             );
         })->join("\n") ?: '(nothing listed yet)';
 
+        $wanted = RecipeEquipment::query()
+            ->missingFromKitchen()
+            ->map(fn (array $recipes, string $name): string => sprintf('- %s (%s)', $name, implode(', ', $recipes)))
+            ->join("\n") ?: '(none)';
+
         $note = trim($note) === '' ? '(no note, just the photos)' : $note;
         $photos = $photoCount === 0 ? 'none' : (string) $photoCount;
 
@@ -148,6 +155,9 @@ class ReadEquipmentUpdate
 
         Equipment already listed:
         {$listed}
+
+        Equipment the recipes call for that isn't listed:
+        {$wanted}
         TEXT;
     }
 }
