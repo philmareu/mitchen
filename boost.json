@@ -17,6 +17,8 @@
         "ai-sdk-development",
         "laravel-best-practices",
         "testing-best-practices",
+        "mcp-development",
+        "passport-development",
         "tailwindcss-development"
     ]
 }
