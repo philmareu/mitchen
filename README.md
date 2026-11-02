@@ -26,7 +26,7 @@ Your recipes live alongside it, so each one shows what's on hand, what's missing
 - **Recipes that get better.** Press *Made it* to log a batch: how it turned out and what to change next time, even days later (pickles taste right on day three). *Update from notes* has Claude work your notes into the recipe ("more salt, less vinegar" becomes `1½ tsp` salt and `¾ cup` vinegar); you check it and it's saved as a new version. Every change keeps the old version, with what changed.
 - **Substitutes and variants.** A substitute stands in for one ingredient when you're out (no buttermilk: milk and lemon juice), so the recipe still counts as ready to cook. A variant is a way of making it you pick up front (mild or hot salsa, blueberry pancakes), and the ingredients and shopping list follow it. Quick add reads both off the card.
 - **AI usage and cost.** Every call to Claude is logged with its model, tokens, time and estimated cost, with this month's and all-time spend at a glance.
-- **Ask Claude about your kitchen.** Mitchen is an MCP server, so you can connect it to the Claude app and ask from the counter: what can I make tonight, what's on the shopping list, what should I use up? Tell it what you bought or finished and it reads the changes back, saving them once you agree. Hand it a recipe from a website and it saves it to your collection; tell it how dinner turned out and it goes in the cook log.
+- **Ask Claude about your kitchen.** Mitchen is an MCP server, so you can connect it to the Claude app and ask from the counter: what can I make tonight, what's on the shopping list, what should I use up? Tell it what you bought or finished and it reads the changes back, saving them once you agree. Hand it a recipe from a website and it saves it to your collection; tell it how dinner turned out and it goes in the cook log, then have it work those notes into the next version of the recipe.
 
 ## Getting started
 
@@ -50,7 +50,7 @@ Quick update and photo reading use the [Laravel AI SDK](https://github.com/larav
 
 ## Connecting Claude
 
-Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list, new recipes, the cook log), using the same actions as the app. Claude does the understanding on its side, so these calls don't use your `ANTHROPIC_API_KEY`.
+Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list, new recipes, the cook log, revisions from your notes, previewed before they're saved), using the same actions as the app. Claude does the understanding on its side, so these calls don't use your `ANTHROPIC_API_KEY`.
 
 Clients sign in with OAuth through [Laravel Passport](https://laravel.com/docs/passport):
 

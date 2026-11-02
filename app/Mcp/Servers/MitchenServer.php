@@ -9,9 +9,11 @@ use App\Mcp\Tools\GetShoppingList;
 use App\Mcp\Tools\ListEquipment;
 use App\Mcp\Tools\ListInventory;
 use App\Mcp\Tools\LogCook;
+use App\Mcp\Tools\RecipeHistory;
 use App\Mcp\Tools\RemoveFromShoppingList;
 use App\Mcp\Tools\RestockList;
 use App\Mcp\Tools\UpdateKitchen;
+use App\Mcp\Tools\UpdateRecipe;
 use App\Mcp\Tools\UseSoon;
 use App\Mcp\Tools\WhatToCook;
 use Laravel\Mcp\Server;
@@ -30,6 +32,7 @@ use Laravel\Mcp\Server\Attributes\Version;
     - To change what's on hand or the shopping list, work out the changes, read them back to the cook as a short list, and call `update-kitchen` once they agree. Nothing changes until then. Use the catalog's names (`list-inventory`); a new name is added as a one-off ingredient.
     - `what-to-cook` says how close each recipe is with what's in the kitchen; `get-recipe` gives one recipe with what's on hand for each ingredient, scaled or made as a variant.
     - `add-recipe` saves a recipe from a web page, a pasted recipe or a photo of a card, copied as written; read it back first, like kitchen changes. After the cook makes something, offer to log it with `log-cook`, with how it turned out and what to change next time.
+    - Recipes get better over versions: when the cook wants to work their next-time notes in (`get-recipe` lists those waiting) or change a recipe, use `update-recipe`. It previews by default: show the cook the changes it lists, and save with `preview: false` once they agree. `recipe-history` shows earlier versions.
     - Dates use the YYYY-MM-DD format.
     MARKDOWN)]
 class MitchenServer extends Server
@@ -47,6 +50,8 @@ class MitchenServer extends Server
         RemoveFromShoppingList::class,
         AddRecipe::class,
         LogCook::class,
+        UpdateRecipe::class,
+        RecipeHistory::class,
     ];
 
     protected array $resources = [
