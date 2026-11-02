@@ -9,6 +9,7 @@ use App\Enums\EquipmentCategory;
 use App\Enums\EquipmentChangeKind;
 use App\Filament\Resources\Equipment\EquipmentResource;
 use App\Models\Equipment;
+use App\Models\RecipeEquipment;
 use App\Support\ProposedEquipment;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Hidden;
@@ -31,6 +32,7 @@ use Filament\Support\Exceptions\Halt;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\HtmlString;
 use Livewire\Features\SupportFileUploads\TemporaryUploadedFile;
 use Throwable;
@@ -44,6 +46,11 @@ use Throwable;
 class QuickAddEquipmentAction extends Action
 {
     private const int MAX_PHOTOS = 4;
+
+    /**
+     * @var Collection<string, list<string>>|null
+     */
+    private ?Collection $missingFromKitchen = null;
 
     public static function getDefaultName(): ?string
     {
@@ -190,7 +197,13 @@ class QuickAddEquipmentAction extends Action
                 TextInput::make('name')
                     ->required()
                     ->maxLength(255)
-                    ->datalist(fn (): array => Equipment::query()->orderBy('name')->pluck('name')->unique()->values()->all())
+                    ->datalist(fn (): array => Equipment::query()
+                        ->pluck('name')
+                        ->merge($this->missingFromKitchen()->keys())
+                        ->unique(fn (string $name): string => mb_strtolower($name))
+                        ->sort(SORT_NATURAL | SORT_FLAG_CASE)
+                        ->values()
+                        ->all())
                     ->belowContent(fn (Get $get): ?string => $this->describe($get)),
                 Select::make('category')
                     ->options(EquipmentCategory::class)
@@ -227,14 +240,28 @@ class QuickAddEquipmentAction extends Action
     private function describe(Get $get): ?string
     {
         $name = trim((string) $get('name'));
-        $isListed = $name !== ''
-            && $this->kind($get('kind')) === EquipmentChangeKind::Added
-            && Equipment::query()->named($name)->exists();
+        $isAdded = $name !== '' && $this->kind($get('kind')) === EquipmentChangeKind::Added;
+        $isListed = $isAdded && Equipment::query()->named($name)->exists();
+        $neededFor = $isAdded && ! $isListed
+            ? $this->missingFromKitchen()->first(fn (array $recipes, string $wanted): bool => mb_strtolower($wanted) === mb_strtolower($name))
+            : null;
 
         return collect([
             filled($get('from_note')) ? '“'.$get('from_note').'”' : null,
             $isListed ? 'you have one listed already' : null,
+            $neededFor !== null ? 'needed for '.Arr::join($neededFor, ', ', ' and ') : null,
         ])->filter()->join(' · ') ?: null;
+    }
+
+    /**
+     * What the recipes call for that the kitchen doesn't have, looked up once per request
+     * rather than for every row.
+     *
+     * @return Collection<string, list<string>>
+     */
+    private function missingFromKitchen(): Collection
+    {
+        return $this->missingFromKitchen ??= RecipeEquipment::query()->missingFromKitchen();
     }
 
     private function kind(mixed $kind): ?EquipmentChangeKind

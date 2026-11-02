@@ -50,7 +50,7 @@ Quick update and photo reading use the [Laravel AI SDK](https://github.com/larav
 
 ## Connecting Claude
 
-Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list, new recipes, the cook log, revisions from your notes, previewed before they're saved), using the same actions as the app. Claude does the understanding on its side, so these calls don't use your `ANTHROPIC_API_KEY`.
+Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list, new recipes, the cook log, revisions from your notes, previewed before they're saved, and equipment you forgot to list, so recipes that need it count it as there), using the same actions as the app. Claude does the understanding on its side, so these calls don't use your `ANTHROPIC_API_KEY`.
 
 Clients sign in with OAuth through [Laravel Passport](https://laravel.com/docs/passport):
 
