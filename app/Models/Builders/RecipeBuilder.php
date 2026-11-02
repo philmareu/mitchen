@@ -12,6 +12,11 @@ use Illuminate\Support\Collection;
  */
 class RecipeBuilder extends Builder
 {
+    public function named(string $name): static
+    {
+        return $this->whereRaw('lower(name) = ?', [mb_strtolower(trim($name))]);
+    }
+
     /**
      * Recipes the kitchen has everything for, made as written or as a variant.
      */
