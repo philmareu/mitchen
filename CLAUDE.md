@@ -75,7 +75,7 @@ A kitchen assistant: ingredients, what's on hand, equipment, recipes, and (to co
 
 ## Rules
 
-- Dev database on this machine: MySQL `sous_chef` (from the project's old name, Sous Chef; `.env.example` uses `mitchen` for fresh installs) at 127.0.0.1:3306 (root, no password). Tests use in-memory SQLite, so stay driver-neutral.
+- Dev database on this machine: MySQL `mitchen` at 127.0.0.1:3306 (root, no password). Tests use in-memory SQLite, so stay driver-neutral.
 - `ANTHROPIC_API_KEY` lives only in `.env`. Models are set in `config/ai.php`: `ANTHROPIC_MODEL` (default `claude-opus-5-5`) and `ANTHROPIC_FAST_MODEL` (default `claude-haiku-5-5`, used by quick update).
 - Business logic goes in `app/Actions` (and pure helpers in `app/Support`), not in Filament classes.
 - Serve with `php artisan serve` and no `--port`; read the URL from its output. Stop servers you started. To click around without touching the dev data, migrate and seed a scratch SQLite file and serve with `DB_CONNECTION=sqlite DB_DATABASE=<file> php artisan serve --no-reload` (without `--no-reload` the server drops env vars so `.env` wins).
