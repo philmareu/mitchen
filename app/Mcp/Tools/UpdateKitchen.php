@@ -43,6 +43,7 @@ class UpdateKitchen extends Tool
             'changes.*.inventory_item_id' => ['nullable', 'integer'],
             'changes.*.category' => ['nullable', Rule::enum(IngredientCategory::class)],
             'changes.*.expires_on' => ['nullable', 'date_format:Y-m-d'],
+            'changes.*.ready_on' => ['nullable', 'date_format:Y-m-d'],
             'changes.*.price' => ['nullable', 'numeric', 'min:0'],
             'shopping_list_ids' => ['nullable', 'array'],
             'shopping_list_ids.*' => ['integer'],
@@ -86,6 +87,7 @@ class UpdateKitchen extends Tool
                     'inventory_item_id' => $schema->integer()->description('The item a set or used_up change is about.'),
                     'category' => $schema->string()->enum(IngredientCategory::class)->description('The aisle, for something new.'),
                     'expires_on' => $schema->string()->format('date')->description('Use-by date, only when the cook gives one.'),
+                    'ready_on' => $schema->string()->format('date')->description('For bought or set: when something here but not ready yet will be (hard avocados on the counter: about 4 days). Recipes plan ahead for it until then. Today when the cook says it\'s ripe now.'),
                     'price' => $schema->number()->min(0)->description('For bought: what it cost in total, when the cook says.'),
                 ]))
                 ->min(1)

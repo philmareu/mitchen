@@ -6,6 +6,7 @@ use App\Enums\Availability;
 use App\Enums\StockLevel;
 use App\Support\Quantity;
 use App\Support\UnreadableQuantity;
+use Carbon\CarbonInterface;
 use Database\Factories\RecipeIngredientFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Collection;
@@ -99,8 +100,9 @@ class RecipeIngredient extends Model
     }
 
     /**
-     * On hand when it's always on hand (tap water) or any of it isn't low or out (an unmeasured
-     * item counts), running low when all that's left is low, otherwise out.
+     * On hand when it's always on hand (tap water) or any of what's ready isn't low or out (an
+     * unmeasured item counts), running low when all that's ready is low, ripening when the
+     * only supply isn't ready yet, otherwise out.
      */
     public function availability(): Availability
     {
@@ -108,14 +110,39 @@ class RecipeIngredient extends Model
             return Availability::OnHand;
         }
 
-        $quantities = $this->ingredient?->inventoryItems->map(fn (InventoryItem $item): Quantity => $item->quantity);
+        $items = $this->ingredient?->inventoryItems;
+        $ready = $items?->reject(fn (InventoryItem $item): bool => $item->isRipening())->map(fn (InventoryItem $item): Quantity => $item->quantity);
 
         return match (true) {
-            $quantities === null => Availability::Out,
-            $quantities->contains(fn (Quantity $quantity): bool => ! $quantity->needsRestock()) => Availability::OnHand,
-            $quantities->contains(fn (Quantity $quantity): bool => $quantity->level === StockLevel::Low) => Availability::Low,
+            $ready === null => Availability::Out,
+            $ready->contains(fn (Quantity $quantity): bool => ! $quantity->needsRestock()) => Availability::OnHand,
+            $ready->contains(fn (Quantity $quantity): bool => $quantity->level === StockLevel::Low) => Availability::Low,
+            $this->readyOn() !== null => Availability::Ripening,
             default => Availability::Out,
         };
+    }
+
+    /**
+     * "ripening, ready Nov 19", while what's here isn't ready yet; null otherwise.
+     */
+    public function ripeningLabel(): ?string
+    {
+        $readyOn = $this->readyOn();
+
+        return $readyOn === null ? null : 'ripening, ready '.($readyOn->isTomorrow() ? 'tomorrow' : $readyOn->format('M j'));
+    }
+
+    /**
+     * When the first of it that's still ripening will be ready; null when none is ripening.
+     */
+    public function readyOn(): ?CarbonInterface
+    {
+        return $this->ingredient?->inventoryItems
+            ->reject(fn (InventoryItem $item): bool => $item->quantity->level === StockLevel::Out)
+            ->map(fn (InventoryItem $item): ?CarbonInterface => $item->ripeningUntil())
+            ->filter()
+            ->sort()
+            ->first();
     }
 
     /**
@@ -142,11 +169,11 @@ class RecipeIngredient extends Model
     }
 
     /**
-     * It's out, but a substitute isn't: the recipe can still be made.
+     * It's out or still ripening, but a substitute is on hand: the recipe can still be made.
      */
     public function isCoveredBySubstitute(): bool
     {
-        return $this->availability() === Availability::Out && $this->substituteOnHand() !== null;
+        return $this->availability()->isMissing() && $this->substituteOnHand() !== null;
     }
 
     /**
@@ -156,7 +183,8 @@ class RecipeIngredient extends Model
     {
         return $this->ingredient?->inventoryItems
             ->reject(fn (InventoryItem $item): bool => $item->quantity->level === StockLevel::Out)
-            ->map(fn (InventoryItem $item): string => ($item->quantity->format() ?: 'Some').' · '.$item->location->getLabel())
+            ->map(fn (InventoryItem $item): string => ($item->quantity->format() ?: 'Some').' · '.$item->location->getLabel()
+                .(($readyOn = $item->ripeningUntil()) !== null ? ' (ready '.$readyOn->format('M j').')' : ''))
             ->join(', ') ?: null;
     }
 

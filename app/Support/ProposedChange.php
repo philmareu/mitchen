@@ -24,6 +24,7 @@ final readonly class ProposedChange
         public ?CarbonImmutable $expiresOn = null,
         public string $fromNote = '',
         public ?float $price = null,
+        public ?CarbonImmutable $readyOn = null,
     ) {}
 
     /**
@@ -58,11 +59,12 @@ final readonly class ProposedChange
             expiresOn: filled($state['expires_on'] ?? null) ? CarbonImmutable::parse($state['expires_on'])->startOfDay() : null,
             fromNote: (string) ($state['from_note'] ?? ''),
             price: is_numeric($state['price'] ?? null) ? round((float) $state['price'], 2) : null,
+            readyOn: filled($state['ready_on'] ?? null) ? CarbonImmutable::parse($state['ready_on'])->startOfDay() : null,
         );
     }
 
     /**
-     * @return array{kind: string, ingredient: string, quantity: string|null, location: string, inventory_item_id: int|null, category: string, expires_on: string|null, from_note: string, price: float|null}
+     * @return array{kind: string, ingredient: string, quantity: string|null, location: string, inventory_item_id: int|null, category: string, expires_on: string|null, from_note: string, price: float|null, ready_on: string|null}
      */
     public function toArray(): array
     {
@@ -76,6 +78,7 @@ final readonly class ProposedChange
             'expires_on' => $this->expiresOn?->toDateString(),
             'from_note' => $this->fromNote,
             'price' => $this->price,
+            'ready_on' => $this->readyOn?->toDateString(),
         ];
     }
 

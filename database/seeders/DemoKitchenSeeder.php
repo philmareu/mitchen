@@ -82,6 +82,11 @@ class DemoKitchenSeeder extends Seeder
             ]);
         }
 
+        // Bought hard, ripening on the counter.
+        Ingredient::firstOrCreate(['name' => 'Avocados'], ['category' => Category::Produce])
+            ->inventoryItems()
+            ->firstOrCreate(['location' => Location::Counter], ['quantity' => '4', 'ready_on' => now()->addDays(3)]);
+
         ShoppingListItem::firstOrCreate(['name' => 'Lemons'], ['quantity' => '3', 'category' => Category::Produce]);
         ShoppingListItem::firstOrCreate(['name' => 'Paper towels']);
 

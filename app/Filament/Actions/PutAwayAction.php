@@ -70,6 +70,7 @@ class PutAwayAction extends Action
                         TableColumn::make('Price')->width('7rem'),
                         TableColumn::make('Where')->width('9rem'),
                         TableColumn::make('Use by')->width('10rem'),
+                        TableColumn::make('Ready on')->width('10rem'),
                     ])
                     ->compact()
                     ->reorderable(false)
@@ -96,6 +97,7 @@ class PutAwayAction extends Action
                             ->selectablePlaceholder(false)
                             ->required(),
                         DatePicker::make('expires_on'),
+                        DatePicker::make('ready_on'),
                     ]),
             ])
             ->action(function (array $data, PutAwayShopping $putAway, Component $livewire): void {

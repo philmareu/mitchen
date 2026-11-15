@@ -101,6 +101,7 @@ class ReadKitchenUpdate
             inventoryItemId: $item?->id,
             category: $ingredient->category ?? IngredientCategory::tryFrom((string) ($change['category'] ?? '')) ?? IngredientCategory::Other,
             expiresOn: $this->date($change['expires_on'] ?? null),
+            readyOn: in_array($kind, [ChangeKind::Bought, ChangeKind::Set], true) ? $this->date($change['ready_on'] ?? null) : null,
             fromNote: trim((string) ($change['from_note'] ?? '')),
             price: $kind === ChangeKind::Bought ? $this->money($change['price'] ?? null) : null,
         );
@@ -243,7 +244,7 @@ class ReadKitchenUpdate
                 $item->quantity->format() ?: 'some',
                 $item->location->value,
                 $item->expires_on ? ', use by '.$item->expires_on->toDateString() : '',
-            ));
+            ).(($readyOn = $item->ripeningUntil()) !== null ? ', ripening until '.$readyOn->toDateString() : ''));
 
             $tags = collect([
                 $ingredient->is_core ? 'core' : null,

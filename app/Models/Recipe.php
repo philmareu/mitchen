@@ -301,7 +301,7 @@ class Recipe extends Model
     {
         return new RecipeShortfall(
             ingredients: $this->linesFor($variant)
-                ->filter(fn (RecipeIngredient $line): bool => ! $line->is_optional && $line->availability() === Availability::Out && ! $line->isCoveredBySubstitute())
+                ->filter(fn (RecipeIngredient $line): bool => ! $line->is_optional && $line->availability()->isMissing() && ! $line->isCoveredBySubstitute())
                 ->values(),
             equipment: $this->equipment
                 ->reject(fn (RecipeEquipment $piece): bool => $piece->isInKitchen())
@@ -331,14 +331,15 @@ class Recipe extends Model
     }
 
     /**
-     * Ingredients worth getting: out or running low, and not on the shopping list already.
+     * Ingredients worth getting: out or running low (not ripening: there's some coming), and
+     * not on the shopping list already.
      *
      * @return Collection<int, RecipeIngredient>
      */
     public function ingredientsToBuy(?RecipeVariant $variant = null): Collection
     {
         return $this->linesFor($variant)
-            ->reject(fn (RecipeIngredient $line): bool => $line->availability() === Availability::OnHand || $line->isOnShoppingList())
+            ->reject(fn (RecipeIngredient $line): bool => in_array($line->availability(), [Availability::OnHand, Availability::Ripening], true) || $line->isOnShoppingList())
             ->values();
     }
 }

@@ -72,6 +72,21 @@ it('marks an item low', function () {
     expect($item->fresh()->stock_level)->toBe(StockLevel::Low);
 });
 
+it('marks a ripening item ripe, and filters to what is still ripening', function () {
+    $hard = InventoryItem::factory()->quantity('4')->create(['ready_on' => today()->addDays(3)]);
+    $ripe = InventoryItem::factory()->quantity('2')->create();
+
+    livewire(ManageInventoryItems::class)
+        ->assertActionVisible(TestAction::make('ripeNow')->table($hard))
+        ->assertActionHidden(TestAction::make('ripeNow')->table($ripe))
+        ->filterTable('ripening')
+        ->assertCanSeeTableRecords([$hard])
+        ->assertCanNotSeeTableRecords([$ripe])
+        ->callAction(TestAction::make('ripeNow')->table($hard));
+
+    expect($hard->fresh()->ready_on)->toBeNull();
+});
+
 it('uses up a one-off item and keeps a core one for restocking', function () {
     $oneOff = InventoryItem::factory()->create();
     $core = InventoryItem::factory()->for(Ingredient::factory()->core())->create();

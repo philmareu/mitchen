@@ -19,6 +19,7 @@ it('sends the note with the catalog and what is on hand', function () {
     $this->travelTo('2026-10-27');
     $peanutButter = Ingredient::factory()->core()->create(['name' => 'Peanut butter', 'restock_point' => '¼ jar']);
     $item = InventoryItem::factory()->for($peanutButter)->quantity('half a jar')->create(['location' => StorageLocation::Pantry]);
+    $avocados = InventoryItem::factory()->for(Ingredient::factory()->create(['name' => 'Avocados']))->quantity('4')->create(['location' => StorageLocation::Counter, 'ready_on' => '2026-10-30']);
     Ingredient::factory()->create(['name' => 'Saffron']);
     $towels = ShoppingListItem::factory()->create(['name' => 'Paper towels', 'quantity' => '2 rolls']);
     ShoppingListItem::factory()->bought()->create(['name' => 'Dish soap']);
@@ -30,6 +31,7 @@ it('sends the note with the catalog and what is on hand', function () {
     KitchenUpdateReader::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains('Today is Tuesday, October 27, 2026')
         && $prompt->contains('out of PB')
         && $prompt->contains("- Peanut butter [core, restock at ¼ jar]: item {$item->id}: ½ jar in pantry")
+        && $prompt->contains("- Avocados: item {$avocados->id}: 4 in counter, ripening until 2026-10-30")
         && $prompt->contains('- Saffron: nothing on hand')
         && $prompt->contains("- list {$towels->id}: Paper towels, 2 rolls")
         && ! $prompt->contains('Dish soap'));

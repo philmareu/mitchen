@@ -58,7 +58,8 @@ class RecipeSubstitute extends Model
     }
 
     /**
-     * What's on hand for it: out when any line it needs is out, running low when any is low.
+     * What's on hand for it: out when any line it needs is out, ripening when any is still
+     * ripening, running low when any is low.
      */
     public function availability(): Availability
     {
@@ -67,6 +68,7 @@ class RecipeSubstitute extends Model
 
         return match (true) {
             $lines->isEmpty(), $availability->contains(Availability::Out) => Availability::Out,
+            $availability->contains(Availability::Ripening) => Availability::Ripening,
             $availability->contains(Availability::Low) => Availability::Low,
             default => Availability::OnHand,
         };

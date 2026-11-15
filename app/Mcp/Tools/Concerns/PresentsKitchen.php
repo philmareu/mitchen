@@ -31,7 +31,7 @@ trait PresentsKitchen
     }
 
     /**
-     * @return array{id: int, quantity: string, location: string, use_by: string|null}
+     * @return array{id: int, quantity: string, location: string, use_by: string|null, ripening_until: string|null}
      */
     protected function presentItem(InventoryItem $item): array
     {
@@ -40,6 +40,7 @@ trait PresentsKitchen
             'quantity' => $item->quantity->format() ?: 'some',
             'location' => $item->location->value,
             'use_by' => $item->expires_on?->toDateString(),
+            'ripening_until' => $item->ripeningUntil()?->toDateString(),
         ];
     }
 

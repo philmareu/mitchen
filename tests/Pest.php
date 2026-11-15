@@ -34,6 +34,7 @@ function readerChange(array $overrides = []): array
         'location' => 'fridge',
         'category' => 'meat_and_seafood',
         'expires_on' => null,
+        'ready_on' => null,
         'from_note' => 'bought 2 lbs chicken thighs',
         ...$overrides,
     ];

@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\AddRecipe;
+use App\Enums\Availability;
 use App\Enums\Readiness;
 use App\Enums\Sourcing;
 use App\Models\Equipment;
@@ -157,4 +158,32 @@ it('forgets the days and months that no longer apply', function () {
     $ingredient->update(['sourcing' => Sourcing::Grocery]);
 
     expect($ingredient->fresh())->lead_days->toBeNull()->needsLeadTime()->toBeFalse();
+});
+
+it('plans ahead for an ingredient that is here but still ripening, without buying more', function () {
+    $this->travelTo('2026-11-15');
+    $avocados = Ingredient::factory()->create(['name' => 'Avocados']);
+    $hard = InventoryItem::factory()->for($avocados)->quantity('4')->create(['ready_on' => '2026-11-19']);
+    onHand('Limes');
+    $guacamole = suggestable('Guacamole', ['Avocados', 'Limes']);
+
+    $shortfall = closest($guacamole);
+    $line = Recipe::query()->with(Recipe::KITCHEN)->findOrFail($guacamole->id)->ingredients->first();
+
+    expect($shortfall)
+        ->readiness()->toBe(Readiness::PlanAhead)
+        ->leadDays()->toBe(4)
+        ->summary()->toBe('Avocados (ripening, ready Nov 19)')
+        ->and($shortfall->toBuy())->toBeEmpty()
+        ->and($line->availability())->toBe(Availability::Ripening)
+        ->and($line->whereItIs())->toBe('4 · '.$hard->location->getLabel().' (ready Nov 19)')
+        ->and(Recipe::query()->with(Recipe::KITCHEN)->findOrFail($guacamole->id)->ingredientsToBuy()->pluck('name')->all())->toBe([]);
+
+    // A ripe one on the counter is enough to make it now.
+    InventoryItem::factory()->for($avocados)->quantity('1')->create();
+    expect(closest($guacamole)->readiness())->toBe(Readiness::Ready);
+    $avocados->inventoryItems()->where('ready_on', null)->delete();
+
+    $this->travelTo('2026-11-19');
+    expect(closest($guacamole)->readiness())->toBe(Readiness::Ready);
 });
