@@ -47,6 +47,8 @@ trait TakesRecipes
             'variants.*.changes' => ['nullable', 'array', 'max:50'],
             'variants.*.changes.*.name' => ['required', 'string', 'max:255'],
             'variants.*.changes.*.quantity' => ['nullable', 'string', 'max:100'],
+            'variants.*.changes.*.note' => ['nullable', 'string', 'max:255'],
+            'variants.*.changes.*.optional' => ['nullable', 'boolean'],
             'variants.*.changes.*.leave_out' => ['nullable', 'boolean'],
             'variants.*.changes.*.category' => $category,
             'equipment' => ['nullable', 'array', 'max:50'],
@@ -122,6 +124,8 @@ trait TakesRecipes
                     'changes' => $schema->array()->items($schema->object([
                         'quantity' => $quantity(),
                         'name' => $schema->string()->description('An ingredient the recipe has, named exactly as in ingredients, or a new one.')->required(),
+                        'note' => $schema->string()->description('Preparation or size: "diced", "seeded".'),
+                        'optional' => $schema->boolean()->description('true when it\'s optional in this variant.'),
                         'leave_out' => $schema->boolean()->description('true when this variant goes without that ingredient.'),
                         'category' => $category(),
                     ])),
