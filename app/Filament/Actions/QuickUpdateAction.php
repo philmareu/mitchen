@@ -231,6 +231,7 @@ class QuickUpdateAction extends Action
                 TableColumn::make('Price')->width('7rem'),
                 TableColumn::make('Where')->width('9rem'),
                 TableColumn::make('Use by')->width('10rem'),
+                TableColumn::make('Ready on')->width('10rem'),
             ])
             ->compact()
             ->reorderable(false)
@@ -266,6 +267,8 @@ class QuickUpdateAction extends Action
                     ->disabled(fn (Get $get): bool => $this->kind($get('kind')) === ChangeKind::Need)
                     ->required(),
                 DatePicker::make('expires_on')
+                    ->disabled(fn (Get $get): bool => in_array($this->kind($get('kind')), [ChangeKind::UsedUp, ChangeKind::Need], true)),
+                DatePicker::make('ready_on')
                     ->disabled(fn (Get $get): bool => in_array($this->kind($get('kind')), [ChangeKind::UsedUp, ChangeKind::Need], true)),
             ]);
     }

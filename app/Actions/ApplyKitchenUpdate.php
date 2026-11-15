@@ -96,10 +96,15 @@ class ApplyKitchenUpdate
         }
 
         if ($change->kind === ChangeKind::Bought) {
-            $item = $this->restock->handle($ingredient, $quantity, $change->location);
+            $item = $this->restock->handle($ingredient, $quantity, $change->location, $change->readyOn);
         } else {
             $item = $this->itemToSet($ingredient, $change);
             $item->quantity = $quantity;
+
+            // No date leaves it as it was; today or earlier means it's ripe now.
+            if ($change->readyOn !== null) {
+                $item->ripenUntil($change->readyOn);
+            }
         }
 
         if ($change->expiresOn !== null) {

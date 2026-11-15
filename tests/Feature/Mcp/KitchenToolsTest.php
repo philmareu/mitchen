@@ -35,7 +35,7 @@ it('lists the catalog with each item on hand', function () {
                 ->where('core', true)
                 ->where('restock_point', '1 lb')
                 ->where('needs_restock', false)
-                ->where('on_hand', [['id' => $item->id, 'quantity' => '2 lb', 'location' => 'pantry', 'use_by' => '2027-03-01']])
+                ->where('on_hand', [['id' => $item->id, 'quantity' => '2 lb', 'location' => 'pantry', 'use_by' => '2027-03-01', 'ripening_until' => null]])
                 ->etc())
             ->where('ingredients.1.name', 'Saffron')
             ->where('ingredients.1.on_hand', []));

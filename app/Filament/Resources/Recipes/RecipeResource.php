@@ -664,7 +664,8 @@ class RecipeResource extends Resource
                 $line->note,
                 $line->is_optional ? 'optional' : null,
                 $variant !== null && $line->variant_id === $variant->id ? 'for '.$variant->name : null,
-                $line->availability() !== Availability::OnHand && $line->ingredient?->needsLeadTime() ? $line->ingredient->leadTime() : null,
+                $line->availability() === Availability::Ripening ? $line->ripeningLabel() : null,
+                ! in_array($line->availability(), [Availability::OnHand, Availability::Ripening], true) && $line->ingredient?->needsLeadTime() ? $line->ingredient->leadTime() : null,
             ])->filter()->join(' · '),
             ...$line->substitutes()->map(fn (RecipeSubstitute $substitute): string => 'Or '.$substitute->describe($scale)
                 .(filled($substitute->note) ? ' ('.$substitute->note.')' : '')),

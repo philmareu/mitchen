@@ -26,7 +26,7 @@ use Illuminate\Support\Str;
 class PrepareKitchenChanges
 {
     /**
-     * @param  list<array<string, mixed>>  $changes  Validated: kind and ingredient, with any of quantity, location, inventory_item_id, category, expires_on and price.
+     * @param  list<array<string, mixed>>  $changes  Validated: kind and ingredient, with any of quantity, location, inventory_item_id, category, expires_on, ready_on and price.
      * @param  list<int>  $boughtFromList  Shopping list entries the assistant says were bought.
      */
     public function handle(array $changes, array $boughtFromList = [], PurchaseDetails $purchase = new PurchaseDetails): KitchenUpdate
@@ -70,6 +70,7 @@ class PrepareKitchenChanges
             inventoryItemId: $item?->id,
             category: $category,
             expiresOn: blank($change['expires_on'] ?? null) ? null : CarbonImmutable::parse($change['expires_on'])->startOfDay(),
+            readyOn: blank($change['ready_on'] ?? null) || ! in_array($kind, [ChangeKind::Bought, ChangeKind::Set], true) ? null : CarbonImmutable::parse($change['ready_on'])->startOfDay(),
             price: $kind === ChangeKind::Bought && is_numeric($change['price'] ?? null) ? round((float) $change['price'], 2) : null,
         );
     }

@@ -155,6 +155,32 @@ it('restocks the catalog\'s plural and takes it out of the cart when the cook wr
     $this->assertModelMissing($inTheCart);
 });
 
+it('keeps hard avocados apart from ripe ones until they ripen, then marks them ripe', function () {
+    $this->travelTo('2026-11-15');
+    $avocados = Ingredient::factory()->create(['name' => 'Avocados', 'category' => IngredientCategory::Produce]);
+    $ripe = InventoryItem::factory()->for($avocados)->quantity('2')->create(['location' => StorageLocation::Counter]);
+
+    app(ApplyKitchenUpdate::class)->handle([
+        change(['ingredient' => 'Avocados', 'quantity' => '4', 'location' => 'counter', 'ready_on' => '2026-11-19']),
+        change(['ingredient' => 'Avocados', 'quantity' => '2', 'location' => 'counter', 'ready_on' => '2026-11-19']),
+    ]);
+
+    $hard = $avocados->inventoryItems()->whereKeyNot($ripe->id)->sole();
+
+    expect((string) $ripe->fresh()->quantity)->toBe('2')
+        ->and($ripe->fresh()->ready_on)->toBeNull()
+        ->and((string) $hard->quantity)->toBe('6')
+        ->and($hard->ripeningUntil()->toDateString())->toBe('2026-11-19');
+
+    // "The avocados are ripe": today's date means ready now.
+    app(ApplyKitchenUpdate::class)->handle([
+        change(['kind' => 'set', 'ingredient' => 'Avocados', 'quantity' => '6', 'location' => 'counter', 'inventory_item_id' => $hard->id, 'ready_on' => '2026-11-15']),
+    ]);
+
+    expect($hard->fresh()->ready_on)->toBeNull()
+        ->and($hard->fresh()->isRipening())->toBeFalse();
+});
+
 it('uses up core and one-off ingredients by their own rules', function () {
     $milk = InventoryItem::factory()->for(Ingredient::factory()->core()->state(['name' => 'Milk']))->create();
     $basil = InventoryItem::factory()->for(Ingredient::factory()->state(['name' => 'Fresh basil']))->create();
@@ -195,6 +221,7 @@ it('round-trips a proposed change through form state', function () {
         category: IngredientCategory::DairyAndEggs,
         expiresOn: CarbonImmutable::parse('2026-11-14'),
         fromNote: 'six eggs left',
+        readyOn: CarbonImmutable::parse('2026-11-18'),
     );
 
     expect(ProposedChange::fromArray($change->toArray()))->toEqual($change);

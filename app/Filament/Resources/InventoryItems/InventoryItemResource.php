@@ -34,6 +34,7 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Carbon;
 
 class InventoryItemResource extends Resource
 {
@@ -67,6 +68,10 @@ class InventoryItemResource extends Resource
                 self::quantityInput(),
                 DatePicker::make('expires_on')
                     ->label('Use by'),
+                DatePicker::make('ready_on')
+                    ->label('Ready on')
+                    ->helperText('Still ripening (hard avocados): recipes plan ahead for it until then. Leave empty when it\'s ready.')
+                    ->dehydrateStateUsing(fn (?string $state): ?string => filled($state) && Carbon::parse($state)->isAfter(today()) ? $state : null),
                 TextInput::make('notes')
                     ->maxLength(255)
                     ->columnSpanFull(),
@@ -164,6 +169,14 @@ class InventoryItemResource extends Resource
                         default => null,
                     })
                     ->sortable(),
+                TextColumn::make('ready_on')
+                    ->label('Ripening')
+                    ->state(fn (InventoryItem $record): ?string => $record->ripeningUntil()?->format('M j'))
+                    ->formatStateUsing(fn (string $state): string => 'Ready '.$state)
+                    ->badge()
+                    ->color('info')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('notes')
                     ->limit(40)
                     ->toggleable(isToggledHiddenByDefault: true),
@@ -185,10 +198,19 @@ class InventoryItemResource extends Resource
                 Filter::make('running_low')
                     ->label('Low or out')
                     ->query(fn (InventoryItemBuilder $query) => $query->runningLow()),
+                Filter::make('ripening')
+                    ->label('Still ripening')
+                    ->query(fn (InventoryItemBuilder $query) => $query->ripening()),
             ])
             ->recordActions([
                 EditAction::make()
                     ->label('Update'),
+                Action::make('ripeNow')
+                    ->label('Ripe now')
+                    ->icon(Heroicon::OutlinedSparkles)
+                    ->color('success')
+                    ->visible(fn (InventoryItem $record): bool => $record->isRipening())
+                    ->action(fn (InventoryItem $record) => $record->update(['ready_on' => null])),
                 ActionGroup::make([
                     Action::make('markLow')
                         ->label('Mark low')

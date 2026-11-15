@@ -43,7 +43,7 @@ class KitchenUpdateReader implements Agent, HasStructuredOutput
         return <<<TEXT
         You keep a home kitchen's inventory and shopping list up to date. The cook sends a quick note about what changed, written the way people talk, and you turn it into a list of changes they will review before anything is saved.
 
-        You also see today's date, every ingredient in their catalog with what's on hand right now (item ids, amounts, locations, use-by dates), and the shopping list: things still to buy, with list ids. Core ingredients are staples they always keep stocked; some have a restock point, the amount at which they go on the restock list.
+        You also see today's date, every ingredient in their catalog with what's on hand right now (item ids, amounts, locations, use-by dates, and when something still ripening will be ready), and the shopping list: things still to buy, with list ids. Core ingredients are staples they always keep stocked; some have a restock point, the amount at which they go on the restock list.
 
         For each ingredient the note mentions, add one change:
         - kind "bought": new supply came in (bought, picked up, got, was given, made a batch of). quantity is how much came in.
@@ -58,6 +58,7 @@ class KitchenUpdateReader implements Agent, HasStructuredOutput
         - location: one of {$locations}. For existing items, where the item already is. For new supply, where the note says, otherwise where it's normally kept (fresh meat and dairy in the fridge, frozen food in the freezer, dry goods in the pantry, dried spices on the spice rack, whole fruit, onions and garlic on the counter).
         - category: the ingredient's category.
         - expires_on: a YYYY-MM-DD use-by date only if the note gives one ("use by Friday" means the coming Friday). Otherwise null. Never guess a shelf life.
+        - ready_on: for "bought" and "set", a YYYY-MM-DD date when it's in the kitchen but not ready to use yet: fruit or vegetables bought underripe or left to ripen ("4 hard avocados", "peppers to get really ripe, about a week"). Use the time the note gives; when it only says they're unripe, a typical time for that produce where it's kept (hard avocados on the counter about 4 days; in the fridge they barely ripen, about 10). Today's date when the note says something that was ripening is ready now ("avocados are ripe"). Otherwise null.
         - from_note: the few words of the note this change comes from.
         - price: for "bought" only, what was paid for it in total, as a plain number (12.5, not "$12.50"), when the note says. Otherwise null. Never guess a price.
 
@@ -83,6 +84,7 @@ class KitchenUpdateReader implements Agent, HasStructuredOutput
             'location' => $schema->string()->enum(StorageLocation::class)->required(),
             'category' => $schema->string()->enum(IngredientCategory::class)->required(),
             'expires_on' => $schema->string()->nullable()->required(),
+            'ready_on' => $schema->string()->nullable()->required(),
             'from_note' => $schema->string()->required(),
             'price' => $schema->number()->nullable()->required(),
         ])->withoutAdditionalProperties();

@@ -39,6 +39,14 @@ class InventoryItemBuilder extends Builder
     /**
      * Items to use soon: something left, with a use-by date within this many days (or past).
      */
+    /**
+     * Items in the kitchen that aren't ready to use yet.
+     */
+    public function ripening(): static
+    {
+        return $this->whereDate('ready_on', '>', today());
+    }
+
     public function useSoon(int $days = 7): static
     {
         return $this->notOut()->whereDate('expires_on', '<=', today()->addDays($days));

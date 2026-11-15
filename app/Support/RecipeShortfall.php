@@ -42,36 +42,40 @@ final readonly class RecipeShortfall
     }
 
     /**
-     * Missing ingredients that take planning to get: hard to find, out of season or made ahead.
+     * Missing ingredients that take planning: still ripening, hard to find, out of season or
+     * made ahead.
      *
      * @return Collection<int, RecipeIngredient>
      */
     public function needingLeadTime(): Collection
     {
         return $this->ingredients
-            ->filter(fn (RecipeIngredient $line): bool => (bool) $line->ingredient?->needsLeadTime())
+            ->filter(fn (RecipeIngredient $line): bool => $line->readyOn() !== null || (bool) $line->ingredient?->needsLeadTime())
             ->values();
     }
 
     /**
-     * The longest it takes to get or make what's missing, in days, when the cook has said.
+     * The longest it takes to get, make or ripen what's missing, in days, when it's known.
      */
     public function leadDays(): ?int
     {
-        $days = $this->needingLeadTime()->max(fn (RecipeIngredient $line): ?int => $line->ingredient?->lead_days);
+        $days = $this->needingLeadTime()->max(fn (RecipeIngredient $line): ?int => ($readyOn = $line->readyOn()) !== null
+            ? (int) today()->diffInDays($readyOn)
+            : $line->ingredient?->lead_days);
 
         return $days === null ? null : (int) $days;
     }
 
     /**
-     * Missing ingredients to buy (not the ones the cook makes) that aren't on the shopping list yet.
+     * Missing ingredients to buy (not the ones the cook makes, or some already ripening) that
+     * aren't on the shopping list yet.
      *
      * @return Collection<int, RecipeIngredient>
      */
     public function toBuy(): Collection
     {
         return $this->ingredients
-            ->reject(fn (RecipeIngredient $line): bool => $line->ingredient?->sourcing === Sourcing::MakeAhead || $line->isOnShoppingList())
+            ->reject(fn (RecipeIngredient $line): bool => $line->ingredient?->sourcing === Sourcing::MakeAhead || $line->readyOn() !== null || $line->isOnShoppingList())
             ->values();
     }
 
@@ -88,14 +92,16 @@ final readonly class RecipeShortfall
     /**
      * What's missing, in a line: equipment first, since it rules the recipe out, then the
      * ingredients with what getting them takes ("Pickled red onions (make ahead, about 3 days),
-     * Limes"). Empty when nothing is.
+     * Avocados (ripening, ready Nov 19), Limes"). Empty when nothing is.
      */
     public function describe(): string
     {
         return collect($this->equipment)
-            ->concat($this->ingredients->map(fn (RecipeIngredient $line): string => $line->ingredient?->needsLeadTime()
-                ? $line->name.' ('.$line->ingredient->leadTime().')'
-                : $line->name))
+            ->concat($this->ingredients->map(fn (RecipeIngredient $line): string => match (true) {
+                $line->readyOn() !== null => $line->name.' ('.$line->ripeningLabel().')',
+                (bool) $line->ingredient?->needsLeadTime() => $line->name.' ('.$line->ingredient->leadTime().')',
+                default => $line->name,
+            }))
             ->join(', ');
     }
 
