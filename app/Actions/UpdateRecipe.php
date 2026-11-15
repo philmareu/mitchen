@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\Diet;
 use App\Models\Recipe;
 use App\Models\RecipeVersion;
 use App\Support\RecipeDraft;
@@ -28,13 +29,7 @@ class UpdateRecipe
         return DB::transaction(function () use ($recipe, $draft, $note, $cookLogIds): ?RecipeVersion {
             $before = $recipe->snapshot();
 
-            $recipe->update([
-                'name' => $draft->name,
-                'source' => $draft->source,
-                'servings' => $draft->servings,
-                'steps' => $draft->steps,
-                'notes' => $draft->notes,
-            ]);
+            $recipe->update($draft->attributes());
 
             $recipe->substitutes()->delete();
             $recipe->variants()->delete();
@@ -47,7 +42,8 @@ class UpdateRecipe
     }
 
     /**
-     * What saving the draft would change, without saving it: the name, source and notes, then
+     * What saving the draft would change, without saving it: the name, source, notes and how
+     * it's described (cuisine, course, main protein, diets, tags), then
      * the versioned changes (RecipeChanges). It saves inside a transaction and rolls it back,
      * so the list is exactly what handle() would record.
      *
@@ -59,6 +55,11 @@ class UpdateRecipe
             'Name' => [$recipe->name, $draft->name],
             'Source' => [$recipe->source, $draft->source],
             'Notes' => [$recipe->notes, $draft->notes],
+            'Cuisine' => [$recipe->cuisine, $draft->cuisine],
+            'Course' => [$recipe->course?->getLabel(), $draft->course?->getLabel()],
+            'Main protein' => [$recipe->protein?->getLabel(), $draft->protein?->getLabel()],
+            'Diets' => [self::listed(array_map(fn (Diet $diet): string => $diet->getLabel(), $recipe->dietList())), self::listed(array_map(fn (Diet $diet): string => $diet->getLabel(), $draft->diets))],
+            'Tags' => [self::listed($recipe->tags ?? []), self::listed($draft->tags)],
         ])
             ->filter(fn (array $values): bool => $values[0] !== $values[1])
             ->map(fn (array $values, string $field): string => $field === 'Notes'
@@ -76,5 +77,13 @@ class UpdateRecipe
         }
 
         return [...$unversioned->all(), ...$versioned];
+    }
+
+    /**
+     * @param  list<string>  $values
+     */
+    private static function listed(array $values): ?string
+    {
+        return $values === [] ? null : implode(', ', $values);
     }
 }

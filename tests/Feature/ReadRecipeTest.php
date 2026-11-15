@@ -2,9 +2,12 @@
 
 use App\Actions\ReadRecipe;
 use App\Ai\Agents\RecipeReader;
+use App\Enums\Course;
+use App\Enums\Diet;
 use App\Enums\IngredientCategory;
 use App\Models\Equipment;
 use App\Models\Ingredient;
+use App\Models\Recipe;
 use Illuminate\Http\UploadedFile;
 use Laravel\Ai\Prompts\AgentPrompt;
 
@@ -85,6 +88,34 @@ it('tidies the answer, taking catalog and equipment spellings', function () {
         ->category->toBe(IngredientCategory::Other);
 
     expect($lime)->name->toBe('Limes')->isOptional->toBeTrue();
+});
+
+it('reads how the recipe is described, dropping what it doesn\'t know, and sends the cuisines and tags in use', function () {
+    Recipe::factory()->create(['cuisine' => 'Mexican', 'tags' => ['Weeknight']]);
+
+    RecipeReader::fake([readerRecipe([
+        'cuisine' => ' Tex-Mex ',
+        'course' => 'brunch',
+        'protein' => 'bison',
+        'diets' => ['vegan', 'paleo', 'vegan', 'dairy_free'],
+        'tags' => ['weeknight', ' ', 'Weeknight', 'Game day'],
+    ])]);
+
+    $draft = app(ReadRecipe::class)->handle('tortillas');
+
+    RecipeReader::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains('Cuisines the cook\'s recipes use: Mexican')
+        && $prompt->contains('Tags the cook\'s recipes use: Weeknight'));
+
+    expect($draft)
+        ->cuisine->toBe('Tex-Mex')
+        ->course->toBeNull()
+        ->protein->toBeNull()
+        ->diets->toBe([Diet::Vegan, Diet::DairyFree])
+        ->tags->toBe(['weeknight', 'Game day']);
+
+    RecipeReader::fake([readerRecipe()]);
+
+    expect(app(ReadRecipe::class)->handle('tortillas'))->course->toBe(Course::Bread);
 });
 
 it('finds no recipe in an empty answer, and names one that has no name', function () {

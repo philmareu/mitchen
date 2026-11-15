@@ -1,7 +1,9 @@
 <?php
 
 use App\Actions\AddRecipe;
+use App\Enums\Course;
 use App\Enums\EquipmentCategory;
+use App\Enums\Protein;
 use App\Enums\StorageLocation;
 use App\Mcp\Servers\MitchenServer;
 use App\Mcp\Tools\AddRecipe as AddRecipeTool;
@@ -62,12 +64,42 @@ it('lists recipes closest first, then longest since made', function () {
                 ['Crepes', 'quick_shop', null, 'Flour, Milk', ['Flour']],
                 ['Waffles', 'needs_equipment', null, 'Waffle iron', []],
             ])
-            ->where('recipes.2.last_made', '2026-10-20'));
+            ->where('recipes.2.last_made', '2026-10-20')
+            ->etc());
 
     MitchenServer::actingAs($this->cook)
         ->tool(WhatToCook::class, ['readiness' => ['quick_shop', 'needs_equipment']])
         ->assertStructuredContent(fn (AssertableJson $json) => $json
-            ->where('recipes', fn ($recipes) => collect($recipes)->pluck('name')->all() === ['Crepes', 'Waffles']));
+            ->where('recipes', fn ($recipes) => collect($recipes)->pluck('name')->all() === ['Crepes', 'Waffles'])
+            ->etc());
+});
+
+it('finds recipes by cuisine, course, main protein, diet and tag, and lists the cuisines and tags in use', function () {
+    ($this->stock)('Eggs');
+    ($this->recipe)('Huevos rancheros', ['Eggs'])->update(['cuisine' => 'Mexican', 'course' => Course::Breakfast, 'protein' => Protein::Eggs, 'diets' => ['vegetarian'], 'tags' => ['Weekend']]);
+    ($this->recipe)('Carnitas', ['Pork shoulder'])->update(['cuisine' => 'Mexican', 'course' => Course::Main, 'protein' => Protein::Pork]);
+    ($this->recipe)('Frittata', ['Eggs'])->update(['cuisine' => 'Italian', 'course' => Course::Breakfast, 'protein' => Protein::Eggs, 'diets' => ['vegetarian', 'gluten_free']]);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(WhatToCook::class, ['cuisine' => 'mexican', 'readiness' => ['ready']])
+        ->assertStructuredContent(fn (AssertableJson $json) => $json
+            ->where('cuisines', ['Italian', 'Mexican'])
+            ->where('tags', ['Weekend'])
+            ->where('recipes', fn ($recipes) => collect($recipes)->map(fn (array $recipe): array => [$recipe['name'], $recipe['cuisine'], $recipe['course'], $recipe['protein'], $recipe['diets'], $recipe['tags']])->all() === [
+                ['Huevos rancheros', 'Mexican', 'breakfast', 'eggs', ['vegetarian'], ['Weekend']],
+            ]));
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(WhatToCook::class, ['course' => ['main'], 'protein' => ['pork', 'beef']])
+        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('recipes', fn ($recipes) => collect($recipes)->pluck('name')->all() === ['Carnitas'])->etc());
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(WhatToCook::class, ['diets' => ['vegetarian', 'gluten_free']])
+        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('recipes', fn ($recipes) => collect($recipes)->pluck('name')->all() === ['Frittata'])->etc());
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(WhatToCook::class, ['tag' => 'weekend'])
+        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('recipes', fn ($recipes) => collect($recipes)->pluck('name')->all() === ['Huevos rancheros'])->etc());
 });
 
 it('gives a recipe as a variant and scaled, with what\'s on hand for each line', function () {
@@ -154,6 +186,10 @@ it('saves a recipe in the catalog\'s names, adding what\'s new', function () {
         ->tool(AddRecipeTool::class, [
             'name' => 'Buttermilk pancakes',
             'source' => 'https://example.com/pancakes',
+            'cuisine' => 'American',
+            'course' => 'breakfast',
+            'diets' => ['vegetarian'],
+            'tags' => ['Weekend'],
             'servings' => 4,
             'ingredients' => [
                 ['name' => 'all-purpose flour', 'quantity' => '2 cups'],
@@ -181,6 +217,11 @@ it('saves a recipe in the catalog\'s names, adding what\'s new', function () {
     $recipe = Recipe::query()->with(['ingredients', 'substitutes.ingredients', 'variants.ingredients', 'equipment'])->sole();
     expect($recipe)
         ->source->toBe('https://example.com/pancakes')
+        ->cuisine->toBe('American')
+        ->course->toBe(Course::Breakfast)
+        ->protein->toBeNull()
+        ->diets->toBe(['vegetarian'])
+        ->tags->toBe(['Weekend'])
         ->servings->toBe(4)
         ->steps->toBe(['Whisk the dry ingredients.', 'Fold in the buttermilk.']);
     expect($recipe->ingredients->map(fn ($line) => [$line->name, $line->quantity, $line->is_optional])->all())->toBe([

@@ -44,6 +44,11 @@ class ReviseRecipe
         $current = json_encode([
             'name' => $recipe->name,
             'source' => $recipe->source,
+            'cuisine' => $recipe->cuisine,
+            'course' => $recipe->course?->value,
+            'protein' => $recipe->protein?->value,
+            'diets' => $recipe->diets ?? [],
+            'tags' => $recipe->tags ?? [],
             'servings' => $recipe->servings,
             'ingredients' => $recipe->ingredients->map(fn (RecipeIngredient $line): array => [
                 'quantity' => $line->quantity,

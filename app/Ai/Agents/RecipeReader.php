@@ -2,7 +2,10 @@
 
 namespace App\Ai\Agents;
 
+use App\Enums\Course;
+use App\Enums\Diet;
 use App\Enums\IngredientCategory;
+use App\Enums\Protein;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Laravel\Ai\Attributes\MaxTokens;
 use Laravel\Ai\Attributes\Timeout;
@@ -42,6 +45,11 @@ class RecipeReader implements Agent, HasStructuredOutput
         Fields:
         - name: the recipe's name as written ("Grandma's beef stew"). If none is written, a short plain name for the dish.
         - source: where it's from, when the card, page or note says ("Grandma Rose", "back of the Maseca bag", "Joy of Cooking"). Otherwise null.
+        - cuisine: the cuisine it belongs to, in a word or two ("Italian", "Mexican", "Tex-Mex", "German"). Use one the cook's recipes already use when it fits, spelled the same way. Null when it isn't from any particular cuisine.
+        - course: what part of a meal it is: breakfast, main, side, soup, salad, sauce (salsas, dressings, spice mixes, condiments), bread (breads, tortillas, biscuits), dessert, snack or drink. Null when none fits.
+        - protein: its main protein, when it has one: beef, pork, chicken, turkey, lamb, fish, shellfish, beans (beans or lentils), tofu or eggs. Null for a dish without one (a salsa, a cake).
+        - diets: the dietary needs it meets as written, from vegetarian, vegan, gluten_free and dairy_free. Only ones every ingredient clearly allows: chicken stock isn't vegetarian, flour isn't gluten-free, butter isn't dairy-free. Empty when unsure.
+        - tags: only labels the card or note gives ("weeknight", "holiday", "Dad's favorite"), or the cook's tags that the note asks for. Never invent them. Usually empty.
         - servings: how many it serves or makes, as a whole number ("Serves 4" is 4, "Makes 2 dozen" is 24). Null when it doesn't say. Never guess.
         - ingredients: one entry per ingredient, in the recipe's order:
           - quantity: the amount in plain words and standard abbreviations: "2 cups", "1½ tsp", "1 lb", "3", "1 (15 oz) can", "a pinch", "to taste". Write out handwritten shorthand ("c." is cups, "T" or "Tbsp" is tbsp, "t" is tsp). Null when there's no amount.
@@ -101,6 +109,12 @@ class RecipeReader implements Agent, HasStructuredOutput
         return [
             'name' => $schema->string()->required(),
             'source' => $schema->string()->nullable()->required(),
+            'cuisine' => $schema->string()->nullable()->required(),
+            // null is listed so a strict schema accepts "none fits".
+            'course' => $schema->string()->enum([...array_column(Course::cases(), 'value'), null])->nullable()->required(),
+            'protein' => $schema->string()->enum([...array_column(Protein::cases(), 'value'), null])->nullable()->required(),
+            'diets' => $schema->array()->items($schema->string()->enum(Diet::class))->required(),
+            'tags' => $schema->array()->items($schema->string())->required(),
             'servings' => $schema->integer()->nullable()->required(),
             'ingredients' => $schema->array()->items($ingredient)->required(),
             'substitutes' => $schema->array()->items($substitute)->required(),

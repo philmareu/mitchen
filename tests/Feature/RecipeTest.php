@@ -231,3 +231,24 @@ it('puts recipe ingredients on the shopping list with the amount, scaled, when i
         ])
         ->and($recipe->fresh()->ingredientsToBuy()->pluck('name')->all())->toBe(['Lime']);
 });
+
+it('spells a cuisine and tags like the ones already in use, and keeps diets in order', function () {
+    Recipe::factory()->create(['cuisine' => 'Tex-Mex', 'tags' => ['Weeknight']]);
+
+    $recipe = Recipe::factory()->create([
+        'cuisine' => '  tex-mex ',
+        'tags' => ['weeknight', 'Kid favorite', ' ', 'kid favorite'],
+        'diets' => ['gluten_free', 'paleo', 'vegetarian'],
+    ]);
+
+    expect($recipe)
+        ->cuisine->toBe('Tex-Mex')
+        ->tags->toBe(['Weeknight', 'Kid favorite'])
+        ->diets->toBe(['vegetarian', 'gluten_free'])
+        ->and(Recipe::query()->cuisines()->all())->toBe(['Tex-Mex'])
+        ->and(Recipe::query()->tagsInUse()->all())->toBe(['Kid favorite', 'Weeknight']);
+
+    $recipe->update(['cuisine' => '']);
+
+    expect($recipe->cuisine)->toBeNull();
+});

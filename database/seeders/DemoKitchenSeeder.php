@@ -4,8 +4,11 @@ namespace Database\Seeders;
 
 use App\Actions\AddRecipe;
 use App\Actions\UpdateRecipe;
+use App\Enums\Course;
+use App\Enums\Diet;
 use App\Enums\EquipmentCategory;
 use App\Enums\IngredientCategory as Category;
+use App\Enums\Protein;
 use App\Enums\Sourcing;
 use App\Enums\StorageLocation as Location;
 use App\Models\Equipment;
@@ -145,6 +148,7 @@ class DemoKitchenSeeder extends Seeder
         $recipes = [
             new RecipeDraft(
                 name: 'Breakfast for dinner',
+                cuisine: 'American', course: Course::Breakfast, protein: Protein::Eggs, diets: [Diet::Vegetarian], tags: ['Weeknight'],
                 servings: 3,
                 ingredients: [
                     new RecipeLine('Eggs', '6'),
@@ -162,6 +166,7 @@ class DemoKitchenSeeder extends Seeder
             ),
             new RecipeDraft(
                 name: 'Corn tortillas',
+                cuisine: 'Mexican', course: Course::Bread, diets: [Diet::Vegan, Diet::GlutenFree, Diet::DairyFree],
                 source: 'Back of the masa bag',
                 servings: 16,
                 ingredients: [
@@ -178,6 +183,7 @@ class DemoKitchenSeeder extends Seeder
             ),
             new RecipeDraft(
                 name: 'Grandma\'s beef stew',
+                cuisine: 'American', course: Course::Main, protein: Protein::Beef, diets: [Diet::DairyFree], tags: ['Freezes well'],
                 source: 'Grandma\'s card',
                 servings: 6,
                 ingredients: [
@@ -199,6 +205,7 @@ class DemoKitchenSeeder extends Seeder
             ),
             new RecipeDraft(
                 name: 'Coconut chicken curry',
+                cuisine: 'Thai', course: Course::Main, protein: Protein::Chicken, diets: [Diet::GlutenFree, Diet::DairyFree], tags: ['Weeknight'],
                 servings: 4,
                 ingredients: [
                     new RecipeLine('Chicken thighs', '2 lb', 'cut up'),
@@ -216,6 +223,7 @@ class DemoKitchenSeeder extends Seeder
             ),
             new RecipeDraft(
                 name: 'Buttermilk pancakes',
+                cuisine: 'American', course: Course::Breakfast, diets: [Diet::Vegetarian],
                 source: 'Mom\'s card',
                 servings: 4,
                 ingredients: [
@@ -242,6 +250,7 @@ class DemoKitchenSeeder extends Seeder
             ),
             new RecipeDraft(
                 name: 'Fresh salsa',
+                cuisine: 'Mexican', course: Course::Sauce, diets: [Diet::Vegan, Diet::GlutenFree, Diet::DairyFree],
                 servings: 6,
                 ingredients: [
                     new RecipeLine('Tomatoes', '4', 'diced', category: Category::Produce),
@@ -262,6 +271,7 @@ class DemoKitchenSeeder extends Seeder
             ),
             new RecipeDraft(
                 name: 'Black bean tacos',
+                cuisine: 'Mexican', course: Course::Main, protein: Protein::Beans, diets: [Diet::Vegetarian], tags: ['Weeknight'],
                 servings: 4,
                 ingredients: [
                     new RecipeLine('Black beans', '1 can', 'drained', category: Category::CannedAndJarred),
@@ -302,6 +312,9 @@ class DemoKitchenSeeder extends Seeder
 
         $draft = fn (string $vinegar, string $salt): RecipeDraft => new RecipeDraft(
             name: 'Pickled red onions',
+            cuisine: 'Mexican',
+            course: Course::Sauce,
+            diets: [Diet::Vegan, Diet::GlutenFree, Diet::DairyFree],
             servings: 1,
             ingredients: [
                 new RecipeLine('Red onion', '1 large', 'thinly sliced', category: Category::Produce),

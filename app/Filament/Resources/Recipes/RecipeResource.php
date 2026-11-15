@@ -3,6 +3,9 @@
 namespace App\Filament\Resources\Recipes;
 
 use App\Enums\Availability;
+use App\Enums\Course;
+use App\Enums\Diet;
+use App\Enums\Protein;
 use App\Enums\Readiness;
 use App\Filament\Resources\Equipment\EquipmentResource;
 use App\Filament\Resources\Recipes\Pages\CreateRecipe;
@@ -11,6 +14,7 @@ use App\Filament\Resources\Recipes\Pages\ListRecipes;
 use App\Filament\Resources\Recipes\Pages\ViewRecipe;
 use App\Filament\Resources\Recipes\RelationManagers\CookLogsRelationManager;
 use App\Filament\Resources\Recipes\RelationManagers\VersionsRelationManager;
+use App\Models\Builders\RecipeBuilder;
 use App\Models\CookLog;
 use App\Models\Equipment;
 use App\Models\Ingredient;
@@ -30,6 +34,7 @@ use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TagsInput;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -47,6 +52,7 @@ use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
@@ -166,6 +172,26 @@ class RecipeResource extends Resource
             TextInput::make('source')
                 ->maxLength(255)
                 ->placeholder('Grandma\'s card, the back of the masa bag')
+                ->columnSpanFull(),
+            TextInput::make('cuisine')
+                ->maxLength(100)
+                ->placeholder('Italian, Mexican, Tex-Mex')
+                ->datalist(fn (): array => Recipe::query()->cuisines()->all()),
+            Select::make('course')
+                ->options(Course::class)
+                ->placeholder('—'),
+            Select::make('protein')
+                ->label('Main protein')
+                ->options(Protein::class)
+                ->placeholder('None'),
+            CheckboxList::make('diets')
+                ->label('Dietary')
+                ->options(Diet::class)
+                ->columns(2),
+            TagsInput::make('tags')
+                ->placeholder('Weeknight, holiday, kid favorite')
+                ->suggestions(fn (): array => Recipe::query()->tagsInUse()->all())
+                ->nestedRecursiveRules(['max:50'])
                 ->columnSpanFull(),
             Textarea::make('notes')
                 ->rows(2)
@@ -468,6 +494,22 @@ class RecipeResource extends Resource
                         TextEntry::make('servings')
                             ->label('Serves or makes')
                             ->placeholder('—'),
+                        TextEntry::make('kind')
+                            ->label('Cuisine and course')
+                            ->state(fn (Recipe $record): ?string => collect([$record->cuisine, $record->course?->getLabel()])->filter()->join(' · ') ?: null)
+                            ->placeholder('—'),
+                        TextEntry::make('protein')
+                            ->label('Main protein')
+                            ->visible(fn (Recipe $record): bool => $record->protein !== null),
+                        TextEntry::make('dietary')
+                            ->label('Dietary')
+                            ->state(fn (Recipe $record): array => array_map(fn (Diet $diet): string => $diet->getLabel(), $record->dietList()))
+                            ->badge()
+                            ->color('success')
+                            ->visible(fn (Recipe $record): bool => $record->dietList() !== []),
+                        TextEntry::make('tags')
+                            ->badge()
+                            ->visible(fn (Recipe $record): bool => filled($record->tags)),
                         TextEntry::make('version')
                             ->state(fn (Recipe $record): string => 'Version '.$record->version)
                             ->belowContent(fn (Recipe $record): ?string => $record->version > 1 ? 'Earlier versions are under Versions below.' : null),
@@ -510,6 +552,11 @@ class RecipeResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->description(fn (Recipe $record): ?string => $record->source),
+                TextColumn::make('cuisine')
+                    ->description(fn (Recipe $record): ?string => $record->course?->getLabel())
+                    ->placeholder('—')
+                    ->sortable()
+                    ->toggleable(),
                 TextColumn::make('ready')
                     ->label('What it takes')
                     ->state(fn (Recipe $record): Readiness => $record->closestShortfall()->readiness())
@@ -527,6 +574,26 @@ class RecipeResource extends Resource
                     ->placeholder('—')
                     ->sortable()
                     ->toggleable(),
+            ])
+            ->filters([
+                SelectFilter::make('cuisine')
+                    ->options(fn (): array => Recipe::query()->cuisines()->mapWithKeys(fn (string $cuisine): array => [$cuisine => $cuisine])->all())
+                    ->multiple(),
+                SelectFilter::make('course')
+                    ->options(Course::class)
+                    ->multiple(),
+                SelectFilter::make('protein')
+                    ->label('Main protein')
+                    ->options(Protein::class)
+                    ->multiple(),
+                SelectFilter::make('diets')
+                    ->label('Dietary')
+                    ->options(Diet::class)
+                    ->multiple()
+                    ->query(fn (RecipeBuilder $query, array $data): RecipeBuilder => $query->whereDiet(...array_map(Diet::from(...), $data['values'] ?? []))),
+                SelectFilter::make('tags')
+                    ->options(fn (): array => Recipe::query()->tagsInUse()->mapWithKeys(fn (string $tag): array => [$tag => $tag])->all())
+                    ->query(fn (RecipeBuilder $query, array $data): RecipeBuilder => filled($data['value'] ?? null) ? $query->whereTag($data['value']) : $query),
             ])
             ->recordActions([
                 EditAction::make(),

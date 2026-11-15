@@ -19,7 +19,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('One recipe, by id (from what-to-cook) or name: its ingredients with what\'s on hand for each (on_hand, low or out, where it is, and a substitute on hand when it\'s out), substitutes, variants with their changes (as written, in update-recipe\'s shape), equipment and whether the kitchen has it, steps, the latest cook log entries, the next-time notes waiting to be worked in (update-recipe), and a link to its page in Mitchen. Pass variant to make it a variant\'s way, and scale to halve or double it: amounts Mitchen can read are scaled, "a pinch" stays a pinch.')]
+#[Description('One recipe, by id (from what-to-cook) or name: its cuisine, course, main protein, diets and tags, its ingredients with what\'s on hand for each (on_hand, low or out, where it is, and a substitute on hand when it\'s out), substitutes, variants with their changes (as written, in update-recipe\'s shape), equipment and whether the kitchen has it, steps, the latest cook log entries, the next-time notes waiting to be worked in (update-recipe), and a link to its page in Mitchen. Pass variant to make it a variant\'s way, and scale to halve or double it: amounts Mitchen can read are scaled, "a pinch" stays a pinch.')]
 #[IsReadOnly]
 class GetRecipe extends Tool
 {
@@ -82,6 +82,11 @@ class GetRecipe extends Tool
             'name' => $recipe->name,
             'url' => RecipeResource::getUrl('view', ['record' => $recipe]),
             'source' => $recipe->source,
+            'cuisine' => $recipe->cuisine,
+            'course' => $recipe->course?->value,
+            'protein' => $recipe->protein?->value,
+            'diets' => $recipe->diets ?? [],
+            'tags' => $recipe->tags ?? [],
             'servings' => $recipe->servings,
             'scale' => $scale,
             'made_as' => $variant?->name,

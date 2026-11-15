@@ -2,7 +2,10 @@
 
 use App\Actions\AddRecipe;
 use App\Ai\Agents\RecipeReader;
+use App\Enums\Course;
+use App\Enums\Diet;
 use App\Enums\IngredientCategory;
+use App\Enums\Protein;
 use App\Enums\Readiness;
 use App\Enums\StorageLocation;
 use App\Filament\Resources\Recipes\Pages\CreateRecipe;
@@ -93,6 +96,39 @@ it('lists recipes with what it takes to make them, in tabs', function () {
         ->assertCanNotSeeTableRecords([$tortillas, $toast]);
 });
 
+it('filters the recipes by cuisine, course, main protein, diet and tag, and shows them on the recipe page', function () {
+    $tacos = Recipe::factory()->create(['cuisine' => 'Mexican', 'course' => Course::Main, 'protein' => Protein::Beans, 'diets' => ['vegetarian'], 'tags' => ['Weeknight']]);
+    $salsa = Recipe::factory()->create(['cuisine' => 'Mexican', 'course' => Course::Sauce, 'diets' => ['vegan', 'vegetarian']]);
+    $meatballs = Recipe::factory()->create(['cuisine' => 'Italian', 'course' => Course::Main, 'protein' => Protein::Beef, 'tags' => ['Weeknight']]);
+
+    livewire(ListRecipes::class)
+        ->filterTable('cuisine', ['Mexican'])
+        ->assertCanSeeTableRecords([$tacos, $salsa])
+        ->assertCanNotSeeTableRecords([$meatballs])
+        ->resetTableFilters()
+        ->filterTable('course', [Course::Main->value])
+        ->assertCanSeeTableRecords([$tacos, $meatballs])
+        ->assertCanNotSeeTableRecords([$salsa])
+        ->resetTableFilters()
+        ->filterTable('protein', [Protein::Beef->value])
+        ->assertCanSeeTableRecords([$meatballs])
+        ->assertCanNotSeeTableRecords([$tacos, $salsa])
+        ->resetTableFilters()
+        ->filterTable('diets', [Diet::Vegetarian->value, Diet::Vegan->value])
+        ->assertCanSeeTableRecords([$salsa])
+        ->assertCanNotSeeTableRecords([$tacos, $meatballs])
+        ->resetTableFilters()
+        ->filterTable('tags', 'weeknight')
+        ->assertCanSeeTableRecords([$tacos, $meatballs])
+        ->assertCanNotSeeTableRecords([$salsa]);
+
+    livewire(ViewRecipe::class, ['record' => $tacos->getRouteKey()])
+        ->assertSee('Mexican · Main')
+        ->assertSee('Beans or lentils')
+        ->assertSee('Vegetarian')
+        ->assertSee('Weeknight');
+});
+
 it('says on the recipe page what it takes, and what getting each ingredient takes', function () {
     Ingredient::factory()->makeAhead(3)->create(['name' => 'Pickled red onions']);
     $tacos = app(AddRecipe::class)->handle(new RecipeDraft(
@@ -120,6 +156,10 @@ it('adds a recipe by hand', function () {
         ->fillForm([
             'name' => 'Corn tortillas',
             'servings' => 16,
+            'cuisine' => 'Mexican',
+            'course' => 'bread',
+            'diets' => ['gluten_free', 'vegan'],
+            'tags' => ['Taco night'],
             'ingredients' => [
                 ['quantity' => '2 cups', 'name' => 'Masa harina', 'note' => null, 'is_optional' => false],
                 ['quantity' => '½ tsp', 'name' => 'kosher salt', 'note' => null, 'is_optional' => false],
@@ -138,6 +178,11 @@ it('adds a recipe by hand', function () {
         ->name->toBe('Corn tortillas')
         ->servings->toBe(16)
         ->steps->toBe(['Mix.', 'Press and cook.'])
+        ->cuisine->toBe('Mexican')
+        ->course->toBe(Course::Bread)
+        ->protein->toBeNull()
+        ->diets->toBe(['vegan', 'gluten_free'])
+        ->tags->toBe(['Taco night'])
         ->and($recipe->ingredients->pluck('name')->all())->toBe(['Masa harina', 'Kosher salt'])
         ->and($recipe->ingredients[1]->ingredient_id)->toBe($salt->id)
         ->and($recipe->equipment->sole()->name)->toBe('Tortilla press');
@@ -284,6 +329,9 @@ it('reads a typed recipe, lets the cook correct it, then saves it', function () 
 
     expect(Recipe::sole())
         ->servings->toBe(12)
+        ->cuisine->toBe('Mexican')
+        ->course->toBe(Course::Bread)
+        ->diets->toBe(['vegan', 'gluten_free'])
         ->photos->toBe([])
         ->and(Recipe::sole()->ingredients[1]->quantity)->toBe('1⅓ cups');
 });
