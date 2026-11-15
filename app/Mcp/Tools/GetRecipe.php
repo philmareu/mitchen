@@ -19,7 +19,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('One recipe, by id (from what-to-cook) or name: its ingredients with what\'s on hand for each (on_hand, low or out, where it is, and a substitute on hand when it\'s out), substitutes, variants, equipment and whether the kitchen has it, steps, the latest cook log entries, the next-time notes waiting to be worked in (update-recipe), and a link to its page in Mitchen. Pass variant to make it a variant\'s way, and scale to halve or double it: amounts Mitchen can read are scaled, "a pinch" stays a pinch.')]
+#[Description('One recipe, by id (from what-to-cook) or name: its ingredients with what\'s on hand for each (on_hand, low or out, where it is, and a substitute on hand when it\'s out), substitutes, variants with their changes (as written, in update-recipe\'s shape), equipment and whether the kitchen has it, steps, the latest cook log entries, the next-time notes waiting to be worked in (update-recipe), and a link to its page in Mitchen. Pass variant to make it a variant\'s way, and scale to halve or double it: amounts Mitchen can read are scaled, "a pinch" stays a pinch.')]
 #[IsReadOnly]
 class GetRecipe extends Tool
 {
@@ -107,6 +107,13 @@ class GetRecipe extends Tool
             'variants' => $recipe->variants->map(fn (RecipeVariant $variant): array => [
                 'name' => $variant->name,
                 'notes' => $variant->notes,
+                'changes' => $variant->ingredients->map(fn (RecipeIngredient $line): array => [
+                    'name' => $line->name,
+                    'quantity' => $line->quantity,
+                    'note' => $line->note,
+                    'optional' => $line->is_optional,
+                    'leave_out' => $line->is_left_out,
+                ])->values()->all(),
             ])->values()->all(),
             'equipment' => $recipe->equipment->map(fn (RecipeEquipment $piece): array => [
                 'name' => $piece->name,

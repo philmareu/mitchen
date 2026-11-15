@@ -10,6 +10,7 @@ use App\Models\RecipeVersion;
 use App\Models\User;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
+use App\Support\VariantDraft;
 use Illuminate\Testing\Fluent\AssertableJson;
 
 beforeEach(function () {
@@ -91,6 +92,54 @@ it('saves a revision as a new version that takes in the cook\'s notes', function
         ->note->toBe('More salt, less vinegar: the October batch was too sharp.')
         ->previous->ingredients->{1}->quantity->toBe('1 tsp');
     expect($log->fresh()->used_in_version)->toBe(2);
+});
+
+it('keeps the variants\' changes when a revision starts from get-recipe', function () {
+    $recipe = app(AddRecipe::class)->handle(new RecipeDraft(
+        name: 'Salsa',
+        ingredients: [new RecipeLine('Tomatoes', '4'), new RecipeLine('Cilantro', '1 bunch')],
+        variants: [
+            new VariantDraft('Hot', [new RecipeLine('Habanero', '2', note: 'seeded'), new RecipeLine('Carolina Reaper powder', 'a pinch', isOptional: true)]),
+            new VariantDraft('No cilantro', [new RecipeLine('Cilantro', isLeftOut: true)], 'Add more lime.'),
+        ],
+        steps: ['Chop and stir.'],
+    ));
+
+    $variants = null;
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(GetRecipe::class, ['recipe_id' => $recipe->id])
+        ->assertStructuredContent(function (AssertableJson $json) use (&$variants) {
+            $variants = $json->toArray()['variants'];
+
+            $json->where('variants.0.changes', [
+                ['name' => 'Habanero', 'quantity' => '2', 'note' => 'seeded', 'optional' => false, 'leave_out' => false],
+                ['name' => 'Carolina Reaper powder', 'quantity' => 'a pinch', 'note' => null, 'optional' => true, 'leave_out' => false],
+            ])->etc();
+        });
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateRecipe::class, [
+            'recipe_id' => $recipe->id,
+            'name' => 'Salsa',
+            'ingredients' => [['name' => 'Tomatoes', 'quantity' => '5'], ['name' => 'Cilantro', 'quantity' => '1 bunch']],
+            'variants' => $variants,
+            'steps' => ['Chop and stir.'],
+            'preview' => false,
+        ])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('changes', ['Tomatoes: 4 → 5'])->etc());
+
+    $lines = $recipe->fresh()->variants->map(fn ($variant): array => [
+        $variant->name,
+        $variant->notes,
+        $variant->ingredients->map(fn ($line): array => [$line->name, $line->quantity, $line->note, $line->is_optional, $line->is_left_out])->all(),
+    ])->all();
+
+    expect($lines)->toBe([
+        ['Hot', null, [['Habanero', '2', 'seeded', false, false], ['Carolina Reaper powder', 'a pinch', null, true, false]]],
+        ['No cilantro', 'Add more lime.', [['Cilantro', null, null, false, true]]],
+    ]);
 });
 
 it('changes nothing when a revision can\'t be saved', function (array $overrides, string $error) {
