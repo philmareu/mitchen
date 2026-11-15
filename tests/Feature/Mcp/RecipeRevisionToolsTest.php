@@ -43,18 +43,21 @@ it('previews a revision without saving it', function () {
     $log = $recipe->cookLogs()->create(['cooked_on' => '2026-10-28', 'next_time' => 'More salt, less vinegar.']);
 
     MitchenServer::actingAs($this->cook)
-        ->tool(UpdateRecipe::class, ($this->revised)($recipe, ['name' => 'Tomato salsa', 'notes' => 'Better the next day.', 'cook_log_ids' => [$log->id]]))
+        ->tool(UpdateRecipe::class, ($this->revised)($recipe, ['name' => 'Tomato salsa', 'notes' => 'Better the next day.', 'cuisine' => 'Mexican', 'course' => 'sauce', 'diets' => ['vegan', 'gluten_free'], 'cook_log_ids' => [$log->id]]))
         ->assertOk()
         ->assertStructuredContent(['saved' => false, 'changes' => [
             'Name: Salsa → Tomato salsa',
             'Notes: changed',
+            'Cuisine: none → Mexican',
+            'Course: none → Sauce or condiment',
+            'Diets: none → Vegan, Gluten-free',
             'Kosher salt: 1 tsp → 1½ tsp',
             'Vinegar: 1 cup → ¾ cup',
             'Changed step 2: Stir in the salt and ¾ cup vinegar.',
         ]]);
 
     $recipe->refresh();
-    expect($recipe)->name->toBe('Salsa')->version->toBe(1)->notes->toBeNull();
+    expect($recipe)->name->toBe('Salsa')->version->toBe(1)->notes->toBeNull()->cuisine->toBeNull();
     expect($recipe->ingredients->pluck('quantity')->all())->toBe(['4', '1 tsp', '1 cup']);
     expect(RecipeVersion::query()->exists())->toBeFalse();
     expect($log->fresh()->used_in_version)->toBeNull();

@@ -72,6 +72,11 @@ function readerRecipe(array $overrides = []): array
     return [
         'name' => 'Corn tortillas',
         'source' => 'Back of the masa bag',
+        'cuisine' => 'Mexican',
+        'course' => 'bread',
+        'protein' => null,
+        'diets' => ['vegan', 'gluten_free'],
+        'tags' => [],
         'servings' => 16,
         'ingredients' => [
             ['quantity' => '2 cups', 'name' => 'Masa harina', 'note' => null, 'optional' => false, 'category' => 'baking'],

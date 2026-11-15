@@ -3,9 +3,13 @@
 namespace App\Actions;
 
 use App\Ai\Agents\RecipeReader;
+use App\Enums\Course;
+use App\Enums\Diet;
 use App\Enums\IngredientCategory;
+use App\Enums\Protein;
 use App\Models\Equipment;
 use App\Models\Ingredient;
+use App\Models\Recipe;
 use App\Support\Names;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
@@ -83,6 +87,21 @@ class ReadRecipe
             notes: $this->text($response['notes'] ?? null),
             notUnderstood: $this->texts($response['not_understood'] ?? null),
             changeNote: $this->text($response['summary'] ?? null),
+            cuisine: ($cuisine = $this->text($response['cuisine'] ?? null)) === null ? null : Str::limit($cuisine, 100, ''),
+            course: Course::tryFrom((string) $this->text($response['course'] ?? null)),
+            protein: Protein::tryFrom((string) $this->text($response['protein'] ?? null)),
+            diets: collect($this->texts($response['diets'] ?? null))
+                ->map(fn (string $diet): ?Diet => Diet::tryFrom($diet))
+                ->filter()
+                ->unique()
+                ->values()
+                ->all(),
+            tags: collect($this->texts($response['tags'] ?? null))
+                ->map(fn (string $tag): string => Str::limit($tag, 50, ''))
+                ->unique(fn (string $tag): string => mb_strtolower($tag))
+                ->take(10)
+                ->values()
+                ->all(),
         );
     }
 
@@ -206,6 +225,8 @@ class ReadRecipe
         $photos = $photoCount === 0 ? 'none' : (string) $photoCount;
         $catalog = $ingredients->join(', ') ?: '(empty)';
         $kitchen = $equipment->join(', ') ?: '(none listed)';
+        $cuisines = Recipe::query()->cuisines()->join(', ') ?: '(none yet)';
+        $tags = Recipe::query()->tagsInUse()->join(', ') ?: '(none yet)';
 
         return <<<TEXT
         The cook's note:
@@ -218,6 +239,10 @@ class ReadRecipe
         Ingredients in the catalog: {$catalog}
 
         Equipment the kitchen has: {$kitchen}
+
+        Cuisines the cook's recipes use: {$cuisines}
+
+        Tags the cook's recipes use: {$tags}
         TEXT;
     }
 }

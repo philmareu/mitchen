@@ -43,14 +43,7 @@ class AddRecipe
      */
     private function save(RecipeDraft $draft, array $photos): Recipe
     {
-        $recipe = Recipe::create([
-            'name' => $draft->name,
-            'source' => $draft->source,
-            'servings' => $draft->servings,
-            'steps' => $draft->steps,
-            'notes' => $draft->notes,
-            'photos' => $photos,
-        ]);
+        $recipe = Recipe::create([...$draft->attributes(), 'photos' => $photos]);
 
         $this->addLines($recipe, $draft);
 

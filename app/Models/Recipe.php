@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use App\Enums\Availability;
+use App\Enums\Course;
+use App\Enums\Diet;
+use App\Enums\Protein;
 use App\Models\Builders\RecipeBuilder;
 use App\Models\Concerns\OwnsPhotos;
 use App\Support\RecipeShortfall;
@@ -18,8 +21,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * A recipe the cook keeps: their own, one they've tweaked, or one off a package. Its
  * ingredients point at the catalog and its equipment at the kitchen's equipment, so it can
  * say what's on hand. The photos are the original card or page, kept privately.
+ *
+ * Cuisine, course, main protein, diets and tags describe it for sorting and finding it. Like
+ * the name, source and notes they aren't versioned. A cuisine or tag takes the spelling of one
+ * already in use, ignoring case, so "mexican" and "Mexican" stay one cuisine.
  */
-#[Fillable(['name', 'source', 'servings', 'steps', 'notes', 'photos'])]
+#[Fillable(['name', 'source', 'cuisine', 'course', 'protein', 'diets', 'tags', 'servings', 'steps', 'notes', 'photos'])]
 #[UseEloquentBuilder(RecipeBuilder::class)]
 class Recipe extends Model
 {
@@ -52,9 +59,78 @@ class Recipe extends Model
         'version' => 1,
     ];
 
+    protected static function booted(): void
+    {
+        static::saving(function (Recipe $recipe): void {
+            $others = fn (): RecipeBuilder => Recipe::query()->when($recipe->exists, fn (RecipeBuilder $query) => $query->whereKeyNot($recipe->getKey()));
+
+            if ($recipe->isDirty('cuisine')) {
+                $cuisine = trim((string) $recipe->cuisine);
+
+                $recipe->cuisine = $cuisine === ''
+                    ? null
+                    : self::spelledAsInUse($cuisine, $others()->cuisines());
+            }
+
+            if ($recipe->isDirty('tags')) {
+                $inUse = $others()->tagsInUse();
+
+                $recipe->tags = collect($recipe->tags ?? [])
+                    ->map(fn (mixed $tag): string => trim((string) $tag))
+                    ->filter()
+                    ->map(fn (string $tag): string => self::spelledAsInUse($tag, $inUse))
+                    ->unique(fn (string $tag): string => mb_strtolower($tag))
+                    ->values()
+                    ->all();
+            }
+
+            if ($recipe->isDirty('diets')) {
+                $diets = collect($recipe->diets ?? [])->map(fn (mixed $diet): ?Diet => $diet instanceof Diet ? $diet : Diet::tryFrom((string) $diet));
+
+                $recipe->diets = collect(Diet::cases())
+                    ->filter(fn (Diet $diet): bool => $diets->contains($diet))
+                    ->map(fn (Diet $diet): string => $diet->value)
+                    ->values()
+                    ->all();
+            }
+        });
+    }
+
+    /**
+     * @param  iterable<string>  $inUse
+     */
+    private static function spelledAsInUse(string $name, iterable $inUse): string
+    {
+        foreach ($inUse as $existing) {
+            if (mb_strtolower($existing) === mb_strtolower($name)) {
+                return $existing;
+            }
+        }
+
+        return $name;
+    }
+
+    /**
+     * The diets it meets.
+     *
+     * @return list<Diet>
+     */
+    public function dietList(): array
+    {
+        return collect($this->diets ?? [])
+            ->map(fn (mixed $diet): ?Diet => Diet::tryFrom((string) $diet))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
     protected function casts(): array
     {
         return [
+            'course' => Course::class,
+            'protein' => Protein::class,
+            'diets' => 'array',
+            'tags' => 'array',
             'servings' => 'integer',
             'steps' => 'array',
             'photos' => 'array',

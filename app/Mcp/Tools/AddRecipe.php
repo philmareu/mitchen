@@ -22,7 +22,7 @@ use Laravel\Mcp\Server\Tool;
 
     Copy the recipe as written: keep every amount, temperature and time, and never add ingredients or steps it doesn't have. Ingredients take the catalog's name when it has the same thing (list-inventory: "flour" is "All-purpose flour" if that's what it's called, but masa harina is not cornmeal); anything new is added to the catalog as a one-off ingredient in its aisle (category). Equipment is what the recipe needs that not every kitchen has (slow cooker, Dutch oven, tortilla press), in the kitchen's names from list-equipment; leave out knives, bowls, spoons and an ordinary pot or pan.
 
-    Alternatives the recipe gives for one ingredient go in substitutes ("or 1 cup milk + 1 tbsp lemon juice"); named ways of making it, chosen up front, go in variants ("Hot: add 2 habaneros", "Vegetarian: no bacon"). Returns the recipe's id and link, what was new to the catalog, and how close the kitchen is to making it.
+    Alternatives the recipe gives for one ingredient go in substitutes ("or 1 cup milk + 1 tbsp lemon juice"); named ways of making it, chosen up front, go in variants ("Hot: add 2 habaneros", "Vegetarian: no bacon"). Describe it with cuisine, course, main protein and diets where they clearly apply, reusing the cuisines already in use (what-to-cook lists them); tags only when the cook gives them. Returns the recipe's id and link, what was new to the catalog, and how close the kitchen is to making it.
     TEXT)]
 class AddRecipe extends Tool
 {

@@ -3,7 +3,10 @@
 namespace App\Mcp\Tools\Concerns;
 
 use App\Actions\ReadRecipe;
+use App\Enums\Course;
+use App\Enums\Diet;
 use App\Enums\IngredientCategory;
+use App\Enums\Protein;
 use App\Models\Equipment;
 use App\Models\Ingredient;
 use App\Support\RecipeDraft;
@@ -27,6 +30,13 @@ trait TakesRecipes
         return [
             'name' => ['required', 'string', 'max:255'],
             'source' => ['nullable', 'string', 'max:255'],
+            'cuisine' => ['nullable', 'string', 'max:100'],
+            'course' => ['nullable', Rule::enum(Course::class)],
+            'protein' => ['nullable', Rule::enum(Protein::class)],
+            'diets' => ['nullable', 'array'],
+            'diets.*' => [Rule::enum(Diet::class)],
+            'tags' => ['nullable', 'array', 'max:10'],
+            'tags.*' => ['string', 'max:50'],
             'servings' => ['nullable', 'integer', 'min:1', 'max:999'],
             'ingredients' => ['nullable', 'array', 'max:100'],
             'ingredients.*.name' => ['required', 'string', 'max:255'],
@@ -94,6 +104,20 @@ trait TakesRecipes
                 ->required(),
             'source' => $schema->string()
                 ->description('Where it\'s from: the web page\'s URL, a book, a person ("Grandma Rose").'),
+            'cuisine' => $schema->string()
+                ->description('The cuisine in a word or two ("Italian", "Tex-Mex"), spelled like the cuisines the cook\'s recipes already use (what-to-cook lists them). Leave out when it isn\'t from any particular one.'),
+            'course' => $schema->string()
+                ->enum(Course::class)
+                ->description('What part of a meal it is. sauce covers salsas, dressings and spice mixes; bread covers tortillas and biscuits.'),
+            'protein' => $schema->string()
+                ->enum(Protein::class)
+                ->description('Its main protein; leave out for a dish without one. beans covers lentils.'),
+            'diets' => $schema->array()
+                ->items($schema->string()->enum(Diet::class))
+                ->description('Only diets every ingredient clearly allows as written.'),
+            'tags' => $schema->array()
+                ->items($schema->string())
+                ->description('The cook\'s own labels ("weeknight", "holiday"). Only ones the cook gives or the recipe already has.'),
             'servings' => $schema->integer()
                 ->min(1)
                 ->description('How many it serves or makes ("makes 2 dozen" is 24). Leave out when it doesn\'t say.'),

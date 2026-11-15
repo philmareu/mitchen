@@ -37,7 +37,7 @@ class RecipeReviser extends RecipeReader
         Notes about what went wrong once ("burned it, phone rang") or that aren't about the recipe aren't changes.
 
         Fields are the same as when a recipe is read from a card:
-        - name, source, servings, notes: keep them unless a note asks otherwise.
+        - name, source, servings, notes, cuisine, course, protein, diets, tags: keep them unless a note asks otherwise. When a change means a diet no longer holds (bacon added to a vegetarian dish), take that diet off.
         - ingredients: quantity in plain words and standard abbreviations ("1½ tsp", "¾ cup"); name in sentence case, using the catalog's exact name when the catalog has that ingredient; note; optional; category (the grocery aisle, used for an ingredient new to the catalog).
         - substitutes: alternatives for one of the ingredients, with instead_of naming it exactly as in ingredients.
         - variants: named ways of making it; a change for an ingredient the recipe has uses exactly its name, with the variant's amount or leave_out true.
