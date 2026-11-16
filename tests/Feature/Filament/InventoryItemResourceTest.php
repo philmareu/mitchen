@@ -87,6 +87,21 @@ it('marks a ripening item ripe, and filters to what is still ripening', function
     expect($hard->fresh()->ready_on)->toBeNull();
 });
 
+it('marks the selected items out: core ones stay for restocking, one-offs are removed', function () {
+    $rice = InventoryItem::factory()->for(Ingredient::factory()->core())->quantity('2 lb')->create();
+    $basil = InventoryItem::factory()->for(Ingredient::factory())->quantity('a bunch')->create();
+    $eggs = InventoryItem::factory()->for(Ingredient::factory()->core())->quantity('a dozen')->create();
+
+    livewire(ManageInventoryItems::class)
+        ->selectTableRecords([$rice, $basil])
+        ->callAction(TestAction::make('markOut')->table()->bulk())
+        ->assertNotified('1 on the restock list, 1 removed from inventory');
+
+    expect($rice->fresh()->stock_level)->toBe(StockLevel::Out)
+        ->and($basil->fresh())->toBeNull()
+        ->and((string) $eggs->fresh()->quantity)->toBe('12');
+});
+
 it('uses up a one-off item and keeps a core one for restocking', function () {
     $oneOff = InventoryItem::factory()->create();
     $core = InventoryItem::factory()->for(Ingredient::factory()->core())->create();

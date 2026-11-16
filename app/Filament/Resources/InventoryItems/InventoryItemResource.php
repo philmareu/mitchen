@@ -15,6 +15,7 @@ use BackedEnum;
 use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
+use Filament\Actions\BulkAction;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\DeleteBulkAction;
@@ -34,7 +35,10 @@ use Filament\Tables\Filters\TernaryFilter;
 use Filament\Tables\Grouping\Group;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class InventoryItemResource extends Resource
 {
@@ -224,9 +228,44 @@ class InventoryItemResource extends Resource
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
+                    self::markOutBulkAction(),
                     DeleteBulkAction::make(),
                 ]),
             ]);
+    }
+
+    /**
+     * Mark the selected items out, by the same rules as "Used up": core ingredients stay,
+     * marked out, for the restock list; one-offs are removed.
+     */
+    public static function markOutBulkAction(): BulkAction
+    {
+        return BulkAction::make('markOut')
+            ->label('Mark as out')
+            ->icon(Heroicon::OutlinedCheckCircle)
+            ->color('danger')
+            ->requiresConfirmation()
+            ->modalHeading(fn (Collection $records): string => 'Mark '.$records->count().' '.Str::plural('item', $records->count()).' as out?')
+            ->modalDescription('Core ingredients stay in your inventory marked out and go on the restock list. Other ingredients are removed.')
+            ->modalSubmitActionLabel('Mark as out')
+            ->action(function (Collection $records, UseUpInventoryItem $useUp): void {
+                $kept = DB::transaction(fn (): int => InventoryItem::query()
+                    ->with('ingredient')
+                    ->whereKey($records->modelKeys())
+                    ->get()
+                    ->filter(fn (InventoryItem $item): bool => $useUp->handle($item))
+                    ->count());
+                $removed = $records->count() - $kept;
+
+                Notification::make()
+                    ->title(collect([
+                        $kept > 0 ? "{$kept} on the restock list" : null,
+                        $removed > 0 ? "{$removed} removed from inventory" : null,
+                    ])->filter()->join(', '))
+                    ->success()
+                    ->send();
+            })
+            ->deselectRecordsAfterCompletion();
     }
 
     public static function useUpAction(): Action
