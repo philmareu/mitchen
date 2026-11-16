@@ -128,7 +128,13 @@ it('gives a recipe as a variant and scaled, with what\'s on hand for each line',
                 ['Salt', 'a pinch', 'on_hand', '12 · Fridge', null],
                 ['Blueberries', '2 cups', 'out', null, null],
             ])
-            ->where('substitutes.0.instead_of', 'Buttermilk')
+            ->where('substitutes', [[
+                'instead_of' => 'Buttermilk',
+                'use' => [['name' => 'Milk', 'quantity' => '1 cup'], ['name' => 'Lemon juice', 'quantity' => '1 tbsp']],
+                'note' => null,
+                'summary' => '2 cups Milk + 2 tbsp Lemon juice',
+                'on_hand' => 'on_hand',
+            ]])
             ->where('variants.0.name', 'Blueberry')
             ->where('equipment', [['name' => 'Griddle', 'in_kitchen' => false]])
             ->where('cook_log', [['id' => $log->id, 'cooked_on' => '2026-10-25', 'variant' => null, 'thoughts' => 'Fluffy.', 'next_time' => 'More blueberries.']])
