@@ -65,7 +65,7 @@ class RecipeReader implements Agent, HasStructuredOutput
         - variants: named ways of making it that the recipe gives, chosen before cooking ("for hot salsa, add 2 habaneros", "Blueberry: fold in 1 cup blueberries", "vegetarian: skip the bacon"). Not alternatives for a missing ingredient (those are substitutes). One entry per variant:
           - name: short, as the recipe calls it ("Hot", "Blueberry", "Vegetarian").
           - notes: anything else the variant changes, such as in the method ("keep the seeds in"). Otherwise null.
-          - changes: how its ingredients differ. For an ingredient already in ingredients, use exactly the same name with the variant's amount, or leave_out true when the variant goes without it. For an ingredient the recipe doesn't have, its name and amount, written like ingredients.
+          - changes: how its ingredients differ. For an ingredient already in ingredients, use exactly the same name with the variant's amount, or leave_out true when the variant goes without it. For an ingredient the recipe doesn't have, its name and amount, written like ingredients. note and optional work as they do in ingredients.
         - equipment: equipment the recipe needs that not every kitchen has, or that matters for the result: appliances (slow cooker, stand mixer, blender), particular cookware and bakeware (Dutch oven, cast iron skillet, 9×13 baking dish, loaf pan), and single-job tools (tortilla press, potato ricer, thermometer). Leave out everyday basics such as knives, cutting boards, spoons, measuring cups, mixing bowls and an ordinary pot or pan, unless the recipe makes a point of them. When the kitchen has the same piece, use its listed name exactly; otherwise a plain generic name ("Tortilla press").
         - steps: the method, one step per entry, in order, in the recipe's own words, tidied only to fix spelling and write out shorthand. Keep every temperature, time and amount exactly as written.
         - notes: tips, variations or remarks that aren't steps ("Freezes well", "Dad likes extra garlic"). Otherwise null.
@@ -101,6 +101,8 @@ class RecipeReader implements Agent, HasStructuredOutput
             'changes' => $schema->array()->items($schema->object([
                 'quantity' => $schema->string()->nullable()->required(),
                 'name' => $schema->string()->required(),
+                'note' => $schema->string()->nullable()->required(),
+                'optional' => $schema->boolean()->required(),
                 'leave_out' => $schema->boolean()->required(),
                 'category' => $schema->string()->enum(IngredientCategory::class)->required(),
             ])->withoutAdditionalProperties())->required(),

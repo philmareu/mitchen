@@ -72,6 +72,8 @@ class ReviseRecipe
                 'changes' => $variant->ingredients->map(fn (RecipeIngredient $line): array => [
                     'quantity' => $line->quantity,
                     'name' => $line->name,
+                    'note' => $line->note,
+                    'optional' => $line->is_optional,
                     'leave_out' => $line->is_left_out,
                     'category' => $line->ingredient?->category?->value,
                 ])->all(),
