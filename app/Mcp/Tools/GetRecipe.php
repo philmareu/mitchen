@@ -18,7 +18,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('One recipe, by id (from what-to-cook) or name: its cuisine, course, main protein, diets and tags, its ingredients with what\'s on hand for each (on_hand, low, ripening with the date it\'s ready, or out; where it is, and a substitute on hand when it\'s out), substitutes, variants with their changes (as written, in update-recipe\'s shape), equipment and whether the kitchen has it, steps, the latest cook log entries, the next-time notes waiting to be worked in (update-recipe), and a link to its page in Mitchen. Pass variant to make it a variant\'s way, and scale to halve or double it: amounts Mitchen can read are scaled, "a pinch" stays a pinch.')]
+#[Description('One recipe, by id (from what-to-cook) or name: its cuisine, course, main protein, diets and tags, its ingredients with what\'s on hand for each (on_hand, low, ripening with the date it\'s ready, or out; where it is, and a substitute on hand when it\'s out), substitutes (their ingredients as written, in update-recipe\'s shape, and a summary scaled like the ingredients), variants with their changes (as written, in update-recipe\'s shape), equipment and whether the kitchen has it, steps, the latest cook log entries, the next-time notes waiting to be worked in (update-recipe), and a link to its page in Mitchen. Pass variant to make it a variant\'s way, and scale to halve or double it: amounts Mitchen can read are scaled, "a pinch" stays a pinch.')]
 #[IsReadOnly]
 class GetRecipe extends Tool
 {
@@ -105,8 +105,12 @@ class GetRecipe extends Tool
             ])->values()->all(),
             'substitutes' => $recipe->substitutes->map(fn (RecipeSubstitute $substitute): array => [
                 'instead_of' => $substitute->instead_of,
-                'use' => $substitute->describe($scale),
+                'use' => $substitute->ingredients->map(fn (RecipeIngredient $line): array => [
+                    'name' => $line->name,
+                    'quantity' => $line->quantity,
+                ])->values()->all(),
                 'note' => $substitute->note,
+                'summary' => $substitute->describe($scale),
                 'on_hand' => $substitute->availability()->value,
             ])->values()->all(),
             'variants' => $recipe->variants->map(fn (RecipeVariant $variant): array => [
