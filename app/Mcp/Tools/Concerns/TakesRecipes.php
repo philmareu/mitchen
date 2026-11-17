@@ -20,7 +20,7 @@ use Illuminate\Validation\Rule;
  */
 trait TakesRecipes
 {
-    use ChecksNewIngredients;
+    use ChecksNewNames;
 
     /**
      * @return array<string, mixed>
@@ -69,6 +69,7 @@ trait TakesRecipes
             'steps.*' => ['string', 'max:5000'],
             'notes' => ['nullable', 'string', 'max:5000'],
             ...$this->newIngredientRules(),
+            ...$this->equipmentNotInKitchenRules(),
         ];
     }
 
@@ -76,8 +77,9 @@ trait TakesRecipes
      * The validated recipe as a draft, or why it can't be saved.
      *
      * @param  array<string, mixed>  $validated
+     * @param  list<string>  $equipmentBefore  Equipment the recipe already calls for, which isn't asked about again.
      */
-    protected function draft(array $validated, ReadRecipe $read): RecipeDraft|string
+    protected function draft(array $validated, ReadRecipe $read, array $equipmentBefore = []): RecipeDraft|string
     {
         $draft = $read->tidy(
             $validated,
@@ -88,7 +90,10 @@ trait TakesRecipes
         return match (true) {
             $draft->isEmpty() => 'A recipe needs ingredients or steps. Nothing was saved.',
             count($draft->substitutes) < count($validated['substitutes'] ?? []) => 'Each substitute\'s instead_of must name one of the recipe\'s ingredients exactly as written in ingredients. Nothing was saved.',
-            default => $this->newIngredientsToCheck($draft->ingredientNames(), array_values($validated['new_ingredients'] ?? [])) ?? $draft,
+            default => $this->stopForNames(
+                $this->newIngredientsToCheck($draft->ingredientNames(), array_values($validated['new_ingredients'] ?? [])),
+                $this->equipmentNotInKitchenToCheck($draft->equipment, [...array_values($validated['equipment_not_in_kitchen'] ?? []), ...$equipmentBefore]),
+            ) ?? $draft,
         };
     }
 
@@ -166,6 +171,7 @@ trait TakesRecipes
             'notes' => $schema->string()
                 ->description('Tips that aren\'t steps: "Freezes well".'),
             'new_ingredients' => $this->newIngredientsSchema($schema),
+            'equipment_not_in_kitchen' => $this->equipmentNotInKitchenSchema($schema),
         ];
     }
 }

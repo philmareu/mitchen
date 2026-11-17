@@ -226,7 +226,7 @@ class RecipeResource extends Resource
                 ->schema([self::variantsRepeater(withAisle: true)]),
             Section::make('Equipment')
                 ->compact()
-                ->schema([self::equipmentRepeater()]),
+                ->schema([self::equipmentRepeater(withSuggestions: true)]),
             Section::make('Steps')
                 ->compact()
                 ->schema([self::stepsRepeater()]),
@@ -234,11 +234,13 @@ class RecipeResource extends Resource
     }
 
     /**
-     * Put a draft into draftFields(), with the catalog ingredient each new name may mean.
+     * Put a draft into draftFields(), with the catalog ingredient or the piece of equipment each
+     * new name may mean.
      *
-     * @param  array<string, string>  $suggestions  Catalog names keyed by the new name in lowercase (SuggestCatalogNames).
+     * @param  array<string, string>  $suggestions  Catalog names keyed by the new name in lowercase (SuggestCatalogNames::handle()).
+     * @param  array<string, string>  $equipmentSuggestions  Equipment names keyed the same way (SuggestCatalogNames::equipment()).
      */
-    public static function fillDraft(Set $set, RecipeDraft $draft, array $suggestions = []): void
+    public static function fillDraft(Set $set, RecipeDraft $draft, array $suggestions = [], array $equipmentSuggestions = []): void
     {
         $suggest = fn (array $lines): array => array_map(fn (array $line): array => [...$line, 'suggestion' => $suggestions[mb_strtolower($line['name'])] ?? null], $lines);
         $state = $draft->toArray();
@@ -246,6 +248,7 @@ class RecipeResource extends Resource
         $state['ingredients'] = $suggest($state['ingredients']);
         $state['substitutes'] = array_map(fn (array $substitute): array => [...$substitute, 'ingredients' => $suggest($substitute['ingredients'])], $state['substitutes']);
         $state['variants'] = array_map(fn (array $variant): array => [...$variant, 'ingredients' => $suggest($variant['ingredients'])], $state['variants']);
+        $state['equipment'] = array_map(fn (array $piece): array => [...$piece, 'suggestion' => $equipmentSuggestions[mb_strtolower($piece['name'])] ?? null], $state['equipment']);
 
         foreach ($state as $field => $value) {
             $set($field, $value);
@@ -300,10 +303,13 @@ class RecipeResource extends Resource
     }
 
     /**
-     * Swaps the catalog ingredient the assistant thinks a new name means (the row's hidden
-     * `suggestion`) into the field. Shown only while the field holds a name the catalog hasn't got.
+     * Swaps the catalog ingredient (or piece of equipment) the assistant thinks a new name means
+     * (the row's hidden `suggestion`) into the field. Shown only while the field holds a name
+     * that isn't listed.
+     *
+     * @param  class-string<Ingredient|Equipment>  $listedIn
      */
-    public static function useSuggestionAction(string $field): Action
+    public static function useSuggestionAction(string $field, string $listedIn = Ingredient::class): Action
     {
         return Action::make('useSuggestion')
             ->label(fn (Get $get): string => 'Did you mean '.$get('suggestion').'?')
@@ -311,7 +317,7 @@ class RecipeResource extends Resource
             ->visible(fn (Get $get): bool => filled($get('suggestion'))
                 && filled($get($field))
                 && ! Names::same((string) $get('suggestion'), (string) $get($field))
-                && Ingredient::query()->named((string) $get($field))->doesntExist())
+                && $listedIn::query()->named((string) $get($field))->doesntExist())
             ->action(function (Get $get, Set $set) use ($field): void {
                 $set($field, $get('suggestion'));
                 $set('suggestion', null);
@@ -419,7 +425,10 @@ class RecipeResource extends Resource
         return $relationship ? $variants->relationship()->orderColumn('sort') : $variants;
     }
 
-    public static function equipmentRepeater(): Repeater
+    /**
+     * @param  bool  $withSuggestions  Carry the piece the assistant thinks a name it hasn't got means.
+     */
+    public static function equipmentRepeater(bool $withSuggestions = false): Repeater
     {
         return Repeater::make('equipment')
             ->hiddenLabel()
@@ -434,9 +443,10 @@ class RecipeResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->datalist(fn (): array => Equipment::query()->orderBy('name')->pluck('name')->all())
-                    ->belowContent(fn (Get $get): ?string => filled($get('name')) && ! Equipment::query()->named((string) $get('name'))->exists()
-                        ? 'Not in your equipment'
+                    ->belowContent(fn (Get $get): ?array => filled($get('name')) && Equipment::query()->named((string) $get('name'))->doesntExist()
+                        ? ['Not in your equipment', self::useSuggestionAction('name', Equipment::class)]
                         : null),
+                ...($withSuggestions ? [Hidden::make('suggestion')] : []),
             ]);
     }
 

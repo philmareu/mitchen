@@ -328,3 +328,23 @@ it('asks before adding an ingredient whose name is close to one in the catalog',
         ->assertOk()
         ->assertStructuredContent(fn (AssertableJson $json) => $json->where('new_ingredients', ['Tomatillos', 'White onion'])->etc());
 });
+
+it('asks before saving a recipe that needs equipment the kitchen has only under a close name', function () {
+    Equipment::factory()->create(['name' => 'Cast iron skillet']);
+    $hash = [
+        'name' => 'Hash',
+        'ingredients' => [['name' => 'Potatoes', 'quantity' => '2 lb']],
+        'equipment' => ['Skillet', 'Molcajete'],
+    ];
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(AddRecipeTool::class, $hash)
+        ->assertHasErrors(['Skillet (the kitchen has Cast iron skillet)', 'equipment_not_in_kitchen']);
+
+    expect(Recipe::count())->toBe(0);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(AddRecipeTool::class, [...$hash, 'equipment_not_in_kitchen' => ['skillet']])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('equipment_not_in_kitchen', ['Skillet', 'Molcajete'])->etc());
+});

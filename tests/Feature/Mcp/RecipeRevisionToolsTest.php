@@ -5,6 +5,7 @@ use App\Mcp\Servers\MitchenServer;
 use App\Mcp\Tools\GetRecipe;
 use App\Mcp\Tools\RecipeHistory;
 use App\Mcp\Tools\UpdateRecipe;
+use App\Models\Equipment;
 use App\Models\Recipe;
 use App\Models\RecipeVersion;
 use App\Models\User;
@@ -204,4 +205,20 @@ it('lists a recipe\'s versions, newest first, and shows it as it was', function 
     MitchenServer::actingAs($this->cook)
         ->tool(RecipeHistory::class, ['recipe_id' => $recipe->id, 'version' => 4])
         ->assertHasErrors(['Salsa has versions 1 to 3.']);
+});
+
+it('asks only about equipment a revision adds, not what the recipe already calls for', function () {
+    Equipment::factory()->create(['name' => 'Cast iron skillet']);
+    $recipe = ($this->salsa)();
+    $recipe->equipment()->create(['name' => 'Skillet']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateRecipe::class, ($this->revised)($recipe, ['equipment' => ['Skillet', 'Frying pan']]))
+        ->assertOk();
+
+    Equipment::factory()->create(['name' => 'Sheet pan']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateRecipe::class, ($this->revised)($recipe, ['equipment' => ['Skillet', 'Roasting pan']]))
+        ->assertHasErrors(['Roasting pan (the kitchen has Sheet pan)']);
 });

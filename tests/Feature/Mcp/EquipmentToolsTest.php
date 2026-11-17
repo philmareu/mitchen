@@ -88,3 +88,28 @@ it('saves none of the equipment when a piece is of an unknown kind', function ()
 
     expect(Equipment::count())->toBe(0);
 });
+
+it('asks before adding a piece whose name is close to a listed one or to one the recipes call for', function () {
+    $skillet = Equipment::factory()->create(['name' => 'Cast iron skillet', 'brand' => null]);
+    $loaf = Recipe::factory()->create(['name' => 'Banana bread'])->equipment()->create(['name' => 'Loaf pan']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(AddEquipment::class, ['pieces' => [['name' => 'Skillet'], ['name' => 'Bread pan'], ['name' => 'Molcajete']]])
+        ->assertHasErrors(['Skillet (the kitchen has Cast iron skillet); Bread pan (recipes call for Loaf pan)']);
+
+    expect(Equipment::count())->toBe(1);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(AddEquipment::class, ['pieces' => [['name' => 'Cast iron skillets', 'brand' => 'Lodge'], ['name' => 'loaf pans'], ['name' => 'Molcajete'], ['name' => 'Skillet']], 'new_equipment' => ['skillet']])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json
+            ->where('equipment.0.name', 'Cast iron skillet')
+            ->where('equipment.0.added', false)
+            ->where('equipment.1.name', 'Loaf pan')
+            ->where('equipment.1.recipes', ['Banana bread'])
+            ->etc());
+
+    expect($skillet->fresh()->brand)->toBe('Lodge')
+        ->and(Equipment::query()->orderBy('name')->pluck('name')->all())->toBe(['Cast iron skillet', 'Loaf pan', 'Molcajete', 'Skillet'])
+        ->and($loaf->fresh()->isInKitchen())->toBeTrue();
+});

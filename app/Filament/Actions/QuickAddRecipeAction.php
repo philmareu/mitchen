@@ -131,7 +131,9 @@ class QuickAddRecipeAction extends Action
             throw new Halt;
         }
 
-        RecipeResource::fillDraft($set, $draft, app(SuggestCatalogNames::class)->handle($draft->ingredientNames()));
+        $suggest = app(SuggestCatalogNames::class);
+
+        RecipeResource::fillDraft($set, $draft, $suggest->handle($draft->ingredientNames()), $suggest->equipment($draft->equipment));
     }
 
     /**

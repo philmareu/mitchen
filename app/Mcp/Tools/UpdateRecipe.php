@@ -51,7 +51,7 @@ class UpdateRecipe extends Tool
             return Response::error("There's already another recipe called {$other->name} (id {$other->id}). Nothing was saved.");
         }
 
-        $draft = $this->draft($validated, $read);
+        $draft = $this->draft($validated, $read, $recipe->equipment()->pluck('name')->all());
 
         if (is_string($draft)) {
             return Response::error($draft);

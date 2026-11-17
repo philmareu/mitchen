@@ -7,7 +7,7 @@ use App\Actions\PrepareKitchenChanges;
 use App\Enums\ChangeKind;
 use App\Enums\IngredientCategory;
 use App\Enums\StorageLocation;
-use App\Mcp\Tools\Concerns\ChecksNewIngredients;
+use App\Mcp\Tools\Concerns\ChecksNewNames;
 use App\Support\PurchaseDetails;
 use App\Support\UnreadableQuantity;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -30,7 +30,7 @@ use Laravel\Mcp\Server\Tool;
     TEXT)]
 class UpdateKitchen extends Tool
 {
-    use ChecksNewIngredients;
+    use ChecksNewNames;
 
     /**
      * Handle the tool request.
@@ -60,7 +60,7 @@ class UpdateKitchen extends Tool
         // A need only adds a shopping list entry, never an ingredient.
         $adding = array_column(array_filter($validated['changes'], fn (array $change): bool => $change['kind'] !== ChangeKind::Need->value), 'ingredient');
 
-        if ($check = $this->newIngredientsToCheck($adding, array_values($validated['new_ingredients'] ?? []))) {
+        if ($check = $this->stopForNames($this->newIngredientsToCheck($adding, array_values($validated['new_ingredients'] ?? [])))) {
             return Response::error($check);
         }
 

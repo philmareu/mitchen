@@ -515,3 +515,26 @@ it('suggests the catalog ingredient a new name may mean, and swaps it in when th
     expect(Recipe::sole()->ingredients->pluck('ingredient_id')->first())->toBe($greenOnions->id)
         ->and(Ingredient::query()->pluck('name')->all())->toEqualCanonicalizing(['Green onions', 'Sesame oil']);
 });
+
+it('suggests the piece of equipment a recipe\'s name for it may mean, and swaps it in when the cook picks it', function () {
+    config(['ai.providers.anthropic.key' => 'test-key']);
+    $vitamix = Equipment::factory()->create(['name' => 'Vitamix']);
+    RecipeReader::fake([readerRecipe(['equipment' => ['Blender', 'Tortilla press']])]);
+    // The catalog is empty, so the only question is about the equipment.
+    NameMatcher::fake([['matches' => [['name' => 'Blender', 'catalog_name' => 'vitamix'], ['name' => 'Tortilla press', 'catalog_name' => null]]]]);
+
+    livewire(ListRecipes::class)
+        ->mountAction('quickAddRecipe')
+        ->fillForm(['note' => 'Smoothie'])
+        ->goToNextWizardStep()
+        ->assertSchemaStateSet(fn (array $state): bool => $state['equipment'][0]['suggestion'] === 'Vitamix'
+            && $state['equipment'][1]['suggestion'] === null)
+        ->callAction(TestAction::make('useSuggestion')->schemaComponent('equipment.0.name'))
+        ->assertSchemaStateSet(fn (array $state): bool => $state['equipment'][0]['name'] === 'Vitamix')
+        ->callMountedAction()
+        ->assertHasNoFormErrors();
+
+    NameMatcher::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains("- Blender\n- Tortilla press\n\nThe kitchen's equipment: Vitamix"));
+
+    expect(Recipe::sole()->equipment->pluck('equipment_id')->all())->toBe([$vitamix->id, null]);
+});

@@ -2,6 +2,7 @@
 
 use App\Actions\SuggestCatalogNames;
 use App\Ai\Agents\NameMatcher;
+use App\Models\Equipment;
 use App\Models\Ingredient;
 use Laravel\Ai\Prompts\AgentPrompt;
 
@@ -40,4 +41,16 @@ it('suggests nothing when the assistant can\'t be reached', function () {
     NameMatcher::fake(fn () => throw new RuntimeException('Overloaded'));
 
     expect(app(SuggestCatalogNames::class)->handle(['Scallions']))->toBe([]);
+});
+
+it('suggests the listed piece a name for equipment may mean', function () {
+    Equipment::factory()->create(['name' => 'Vitamix']);
+    NameMatcher::fake([['matches' => [
+        ['name' => 'Blender', 'catalog_name' => 'Vitamix'],
+        ['name' => 'Ricer', 'catalog_name' => 'Food mill'],
+    ]]]);
+
+    expect(app(SuggestCatalogNames::class)->equipment(['Blender', 'vitamix', 'Ricer']))->toBe(['blender' => 'Vitamix']);
+
+    NameMatcher::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains("- Blender\n- Ricer\n\nThe kitchen's equipment: Vitamix"));
 });
