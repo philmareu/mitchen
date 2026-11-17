@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Ai\Agents\KitchenUpdateReader;
 use App\Ai\Agents\NameMatcher;
+use App\Models\Equipment;
 use App\Models\Ingredient;
 use App\Support\Names;
 use Illuminate\Support\Collection;
@@ -11,9 +12,10 @@ use Throwable;
 
 /**
  * For names that aren't in the catalog yet, the catalog ingredient each may mean ("Scallions"
- * may be "Green onions"), asked of the fast model so the review can offer it. Never links by
- * itself: Salt and Kosher salt can be a real choice. A suggestion has to be a catalog name, and
- * when the assistant can't be reached there are simply none.
+ * may be "Green onions"), or for equipment the kitchen hasn't got, the piece it may mean
+ * ("Blender" may be the "Vitamix"), asked of the fast model so the review can offer it. Never
+ * links by itself: Salt and Kosher salt can be a real choice. A suggestion has to be a listed
+ * name, and when the assistant can't be reached there are simply none.
  */
 class SuggestCatalogNames
 {
@@ -23,8 +25,25 @@ class SuggestCatalogNames
      */
     public function handle(iterable $names): array
     {
-        $catalog = Ingredient::query()->orderBy('name')->pluck('name');
+        return $this->suggest($names, Ingredient::query()->orderBy('name')->pluck('name'), 'The catalog');
+    }
 
+    /**
+     * @param  iterable<string>  $names
+     * @return array<string, string> The equipment's name, keyed by the new name in lowercase.
+     */
+    public function equipment(iterable $names): array
+    {
+        return $this->suggest($names, Equipment::query()->orderBy('name')->pluck('name'), 'The kitchen\'s equipment');
+    }
+
+    /**
+     * @param  iterable<string>  $names
+     * @param  Collection<int, string>  $catalog
+     * @return array<string, string>
+     */
+    private function suggest(iterable $names, Collection $catalog, string $heading): array
+    {
         $new = collect($names)
             ->map(fn (string $name): string => trim($name))
             ->filter(fn (string $name): bool => $name !== '' && Names::search($name, $catalog) === null)
@@ -36,7 +55,7 @@ class SuggestCatalogNames
         }
 
         try {
-            $response = NameMatcher::make()->prompt($this->prompt($new, $catalog));
+            $response = NameMatcher::make()->prompt($this->prompt($new, $catalog, $heading));
         } catch (Throwable $exception) {
             report($exception);
 
@@ -60,8 +79,8 @@ class SuggestCatalogNames
      * @param  Collection<int, covariant string>  $new
      * @param  Collection<int, string>  $catalog
      */
-    private function prompt(Collection $new, Collection $catalog): string
+    private function prompt(Collection $new, Collection $catalog, string $heading): string
     {
-        return "New names:\n- ".$new->join("\n- ")."\n\nThe catalog: ".$catalog->join(', ');
+        return "New names:\n- ".$new->join("\n- ")."\n\n{$heading}: ".$catalog->join(', ');
     }
 }
