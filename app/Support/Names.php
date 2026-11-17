@@ -26,7 +26,7 @@ class Names
      *
      * @template TKey of array-key
      *
-     * @param  Collection<TKey, string>  $names
+     * @param  Collection<TKey, covariant string>  $names
      * @return TKey|null
      */
     public static function search(string $name, Collection $names): int|string|null
@@ -38,6 +38,33 @@ class Names
         }
 
         return $key === false ? null : $key;
+    }
+
+    /**
+     * Listed names that may mean the same thing as this one, for the cook to check, never to link
+     * by themselves: a slip of a letter or two ("cilantor" for "Cilantro"), or the same last word
+     * ("White onion" and "Yellow onion", "Salt" and "Kosher salt"). The same name isn't listed.
+     *
+     * @param  Collection<array-key, string>  $names
+     * @return list<string>
+     */
+    public static function close(string $name, Collection $names, int $limit = 5): array
+    {
+        $name = mb_strtolower(trim($name));
+        $lastWord = Str::afterLast($name, ' ');
+
+        return $names
+            ->reject(fn (string $listed): bool => self::same($listed, $name))
+            ->filter(function (string $listed) use ($name, $lastWord): bool {
+                $listed = mb_strtolower(trim($listed));
+                $typos = min(mb_strlen($name), mb_strlen($listed)) >= 5 ? 2 : 1;
+
+                return levenshtein($name, $listed) <= $typos
+                    || self::same(Str::afterLast($listed, ' '), $lastWord);
+            })
+            ->take($limit)
+            ->values()
+            ->all();
     }
 
     /**

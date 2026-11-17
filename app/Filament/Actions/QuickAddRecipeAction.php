@@ -4,6 +4,7 @@ namespace App\Filament\Actions;
 
 use App\Actions\AddRecipe;
 use App\Actions\ReadRecipe;
+use App\Actions\SuggestCatalogNames;
 use App\Ai\Agents\RecipeReader;
 use App\Filament\Resources\Equipment\EquipmentResource;
 use App\Filament\Resources\Recipes\RecipeResource;
@@ -130,7 +131,7 @@ class QuickAddRecipeAction extends Action
             throw new Halt;
         }
 
-        RecipeResource::fillDraft($set, $draft);
+        RecipeResource::fillDraft($set, $draft, app(SuggestCatalogNames::class)->handle($draft->ingredientNames()));
     }
 
     /**

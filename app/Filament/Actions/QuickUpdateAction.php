@@ -4,10 +4,12 @@ namespace App\Filament\Actions;
 
 use App\Actions\ApplyKitchenUpdate;
 use App\Actions\ReadKitchenUpdate;
+use App\Actions\SuggestCatalogNames;
 use App\Ai\Agents\KitchenUpdateReader;
 use App\Enums\ChangeKind;
 use App\Enums\StorageLocation;
 use App\Filament\Resources\InventoryItems\InventoryItemResource;
+use App\Filament\Resources\Recipes\RecipeResource;
 use App\Models\Ingredient;
 use App\Models\InventoryItem;
 use App\Models\ShoppingListItem;
@@ -179,7 +181,14 @@ class QuickUpdateAction extends Action
             throw new Halt;
         }
 
-        $set('changes', array_map(fn (ProposedChange $change): array => $change->toArray(), $update->changes));
+        $suggestions = app(SuggestCatalogNames::class)->handle(collect($update->changes)
+            ->reject(fn (ProposedChange $change): bool => $change->kind === ChangeKind::Need)
+            ->map(fn (ProposedChange $change): string => $change->ingredient));
+
+        $set('changes', array_map(fn (ProposedChange $change): array => [
+            ...$change->toArray(),
+            'suggestion' => $change->kind === ChangeKind::Need ? null : $suggestions[mb_strtolower($change->ingredient)] ?? null,
+        ], $update->changes));
         $set('not_understood', $update->notUnderstood);
         $set('bought_from_list', array_map(strval(...), $update->boughtFromList));
         $set('not_seen', $update->notSeen);
@@ -240,6 +249,7 @@ class QuickUpdateAction extends Action
                 Hidden::make('inventory_item_id'),
                 Hidden::make('category'),
                 Hidden::make('from_note'),
+                Hidden::make('suggestion'),
                 Select::make('kind')
                     ->options(ChangeKind::class)
                     ->default(ChangeKind::Bought)
@@ -250,7 +260,7 @@ class QuickUpdateAction extends Action
                     ->required()
                     ->maxLength(255)
                     ->datalist(fn (): array => Ingredient::query()->orderBy('name')->pluck('name')->all())
-                    ->belowContent(fn (Get $get): ?string => $this->describe($get)),
+                    ->belowContent(fn (Get $get): array => array_filter([$this->describe($get), RecipeResource::useSuggestionAction('ingredient')])),
                 TextInput::make('quantity')
                     ->placeholder(fn (Get $get): string => $this->kind($get('kind')) === ChangeKind::UsedUp ? '—' : 'e.g. 2 lb')
                     ->disabled(fn (Get $get): bool => $this->kind($get('kind')) === ChangeKind::UsedUp)

@@ -308,3 +308,23 @@ it('logs nothing for a variant the recipe hasn\'t got', function () {
 
     expect($recipe->cookLogs()->exists())->toBeFalse();
 });
+
+it('asks before adding an ingredient whose name is close to one in the catalog', function () {
+    Ingredient::factory()->create(['name' => 'Yellow onions']);
+    Ingredient::factory()->create(['name' => 'Kosher salt']);
+    $salsa = [
+        'name' => 'Salsa',
+        'ingredients' => [['name' => 'White onion', 'quantity' => '1'], ['name' => 'Salt', 'quantity' => 'to taste'], ['name' => 'Tomatillos', 'quantity' => '6']],
+    ];
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(AddRecipeTool::class, $salsa)
+        ->assertHasErrors(['White onion (the catalog has Yellow onions); Salt (the catalog has Kosher salt)']);
+
+    expect(Recipe::count())->toBe(0);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(AddRecipeTool::class, [...$salsa, 'ingredients' => [['name' => 'White onion', 'quantity' => '1'], ['name' => 'Kosher salt', 'quantity' => 'to taste'], ['name' => 'Tomatillos', 'quantity' => '6']], 'new_ingredients' => ['white onion']])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json->where('new_ingredients', ['Tomatillos', 'White onion'])->etc());
+});

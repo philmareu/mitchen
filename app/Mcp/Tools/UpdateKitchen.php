@@ -7,6 +7,7 @@ use App\Actions\PrepareKitchenChanges;
 use App\Enums\ChangeKind;
 use App\Enums\IngredientCategory;
 use App\Enums\StorageLocation;
+use App\Mcp\Tools\Concerns\ChecksNewIngredients;
 use App\Support\PurchaseDetails;
 use App\Support\UnreadableQuantity;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
@@ -21,7 +22,7 @@ use Laravel\Mcp\Server\Tool;
 #[Description(<<<'TEXT'
     Save changes to what's on hand and the shopping list, all or nothing. Read the changes back to the cook first and only call this once they agree.
 
-    Kinds: bought (new supply came in; quantity is how much), set (how much is left now: "half a bag", "low"), used_up (finished or thrown away) and need (put it on the shopping list; quantity is how much to get). Use catalog names from list-inventory; a new name is added as a one-off ingredient, except for need, which only adds a list entry.
+    Kinds: bought (new supply came in; quantity is how much), set (how much is left now: "half a bag", "low"), used_up (finished or thrown away) and need (put it on the shopping list; quantity is how much to get). Use catalog names from list-inventory; a new name is added as a one-off ingredient, except for need, which only adds a list entry. When a new name is close to a catalog one, nothing is saved: check with the cook, then use the catalog name or confirm it in new_ingredients.
 
     For set and used_up, pass the item's inventory_item_id when the ingredient is in more than one place. Without a location, a change goes where the ingredient already is, else where its aisle usually goes; a location moves the item there.
 
@@ -29,6 +30,8 @@ use Laravel\Mcp\Server\Tool;
     TEXT)]
 class UpdateKitchen extends Tool
 {
+    use ChecksNewIngredients;
+
     /**
      * Handle the tool request.
      */
@@ -51,7 +54,15 @@ class UpdateKitchen extends Tool
             'purchase.store' => ['nullable', 'string', 'max:255'],
             'purchase.purchased_on' => ['nullable', 'date_format:Y-m-d', 'before_or_equal:today'],
             'purchase.total' => ['nullable', 'numeric', 'min:0'],
+            ...$this->newIngredientRules(),
         ]);
+
+        // A need only adds a shopping list entry, never an ingredient.
+        $adding = array_column(array_filter($validated['changes'], fn (array $change): bool => $change['kind'] !== ChangeKind::Need->value), 'ingredient');
+
+        if ($check = $this->newIngredientsToCheck($adding, array_values($validated['new_ingredients'] ?? []))) {
+            return Response::error($check);
+        }
 
         $update = $prepare->handle(
             array_values($validated['changes']),
@@ -100,6 +111,7 @@ class UpdateKitchen extends Tool
                 'purchased_on' => $schema->string()->format('date')->description('When, if not today.'),
                 'total' => $schema->number()->min(0)->description('What the shop came to.'),
             ])->description('For bought changes: the shop they came from.'),
+            'new_ingredients' => $this->newIngredientsSchema($schema),
         ];
     }
 }

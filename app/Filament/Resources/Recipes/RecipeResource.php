@@ -23,8 +23,10 @@ use App\Models\RecipeEquipment;
 use App\Models\RecipeIngredient;
 use App\Models\RecipeSubstitute;
 use App\Models\RecipeVariant;
+use App\Support\Names;
 use App\Support\RecipeDraft;
 use BackedEnum;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -232,12 +234,21 @@ class RecipeResource extends Resource
     }
 
     /**
-     * Put a draft into draftFields().
+     * Put a draft into draftFields(), with the catalog ingredient each new name may mean.
+     *
+     * @param  array<string, string>  $suggestions  Catalog names keyed by the new name in lowercase (SuggestCatalogNames).
      */
-    public static function fillDraft(Set $set, RecipeDraft $draft): void
+    public static function fillDraft(Set $set, RecipeDraft $draft, array $suggestions = []): void
     {
-        foreach ($draft->toArray() as $field => $state) {
-            $set($field, $state);
+        $suggest = fn (array $lines): array => array_map(fn (array $line): array => [...$line, 'suggestion' => $suggestions[mb_strtolower($line['name'])] ?? null], $lines);
+        $state = $draft->toArray();
+
+        $state['ingredients'] = $suggest($state['ingredients']);
+        $state['substitutes'] = array_map(fn (array $substitute): array => [...$substitute, 'ingredients' => $suggest($substitute['ingredients'])], $state['substitutes']);
+        $state['variants'] = array_map(fn (array $variant): array => [...$variant, 'ingredients' => $suggest($variant['ingredients'])], $state['variants']);
+
+        foreach ($state as $field => $value) {
+            $set($field, $value);
         }
 
         // A simple repeater's items each hold their value under the field's name.
@@ -265,18 +276,46 @@ class RecipeResource extends Resource
             ->schema([
                 TextInput::make('quantity')
                     ->maxLength(100),
-                TextInput::make('name')
-                    ->required()
-                    ->maxLength(255)
-                    ->datalist(fn (): array => Ingredient::query()->orderBy('name')->pluck('name')->all())
-                    ->belowContent(fn (Get $get): ?string => filled($get('name')) && ! Ingredient::query()->named((string) $get('name'))->exists()
-                        ? 'New: added to your ingredients'
-                        : null),
+                self::ingredientNameInput(),
                 TextInput::make('note')
                     ->maxLength(255),
                 Checkbox::make('is_optional'),
-                ...($withAisle ? [Hidden::make('category')] : []),
+                ...($withAisle ? [Hidden::make('category'), Hidden::make('suggestion')] : []),
             ]);
+    }
+
+    /**
+     * An ingredient line's name: catalog names to pick from, and a note when the catalog hasn't
+     * got it, with the catalog ingredient it may mean to swap in (useSuggestionAction()).
+     */
+    public static function ingredientNameInput(): TextInput
+    {
+        return TextInput::make('name')
+            ->required()
+            ->maxLength(255)
+            ->datalist(fn (): array => Ingredient::query()->orderBy('name')->pluck('name')->all())
+            ->belowContent(fn (Get $get): ?array => filled($get('name')) && Ingredient::query()->named((string) $get('name'))->doesntExist()
+                ? ['New: added to your ingredients', self::useSuggestionAction('name')]
+                : null);
+    }
+
+    /**
+     * Swaps the catalog ingredient the assistant thinks a new name means (the row's hidden
+     * `suggestion`) into the field. Shown only while the field holds a name the catalog hasn't got.
+     */
+    public static function useSuggestionAction(string $field): Action
+    {
+        return Action::make('useSuggestion')
+            ->label(fn (Get $get): string => 'Did you mean '.$get('suggestion').'?')
+            ->link()
+            ->visible(fn (Get $get): bool => filled($get('suggestion'))
+                && filled($get($field))
+                && ! Names::same((string) $get('suggestion'), (string) $get($field))
+                && Ingredient::query()->named((string) $get($field))->doesntExist())
+            ->action(function (Get $get, Set $set) use ($field): void {
+                $set($field, $get('suggestion'));
+                $set('suggestion', null);
+            });
     }
 
     /**
@@ -300,11 +339,8 @@ class RecipeResource extends Resource
             ->schema([
                 TextInput::make('quantity')
                     ->maxLength(100),
-                TextInput::make('name')
-                    ->required()
-                    ->maxLength(255)
-                    ->datalist(fn (): array => Ingredient::query()->orderBy('name')->pluck('name')->all()),
-                ...($withAisle ? [Hidden::make('category')] : []),
+                self::ingredientNameInput(),
+                ...($withAisle ? [Hidden::make('category'), Hidden::make('suggestion')] : []),
             ]);
 
         $substitutes = Repeater::make('substitutes')
@@ -355,14 +391,11 @@ class RecipeResource extends Resource
             ->schema([
                 TextInput::make('quantity')
                     ->maxLength(100),
-                TextInput::make('name')
-                    ->required()
-                    ->maxLength(255)
-                    ->datalist(fn (): array => Ingredient::query()->orderBy('name')->pluck('name')->all()),
+                self::ingredientNameInput(),
                 TextInput::make('note')
                     ->maxLength(255),
                 Checkbox::make('is_left_out'),
-                ...($withAisle ? [Hidden::make('category')] : []),
+                ...($withAisle ? [Hidden::make('category'), Hidden::make('suggestion')] : []),
             ]);
 
         $variants = Repeater::make('variants')

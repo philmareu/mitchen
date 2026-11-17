@@ -63,6 +63,21 @@ final readonly class RecipeDraft
     }
 
     /**
+     * The names of every ingredient line: its own, its substitutes' and its variants'.
+     *
+     * @return list<string>
+     */
+    public function ingredientNames(): array
+    {
+        return collect($this->ingredients)
+            ->concat(collect($this->substitutes)->flatMap(fn (SubstituteDraft $substitute): array => $substitute->ingredients))
+            ->concat(collect($this->variants)->flatMap(fn (VariantDraft $variant): array => $variant->ingredients))
+            ->map(fn (RecipeLine $line): string => $line->name)
+            ->values()
+            ->all();
+    }
+
+    /**
      * Nothing that looks like a recipe was found.
      */
     public function isEmpty(): bool
