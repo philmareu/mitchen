@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\AddRecipe;
+use App\Ai\Agents\NameMatcher;
 use App\Ai\Agents\RecipeReader;
 use App\Enums\Course;
 use App\Enums\Diet;
@@ -22,6 +23,7 @@ use App\Models\ShoppingListItem;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
 use App\Support\VariantDraft;
+use Filament\Actions\Testing\TestAction;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Support\Facades\Storage;
@@ -488,4 +490,28 @@ it('adds a variant by hand, shows it on the recipe page and logs which one was m
         ->assertHasNoFormErrors();
 
     expect($recipe->cookLogs()->sole()->madeAs())->toBe('Version 1, Hot');
+});
+
+it('suggests the catalog ingredient a new name may mean, and swaps it in when the cook picks it', function () {
+    config(['ai.providers.anthropic.key' => 'test-key']);
+    $greenOnions = Ingredient::factory()->create(['name' => 'Green onions']);
+    RecipeReader::fake([readerRecipe(['ingredients' => [
+        ['quantity' => '2', 'name' => 'Scallions', 'note' => 'sliced', 'optional' => false, 'category' => 'produce'],
+        ['quantity' => '1 tsp', 'name' => 'Sesame oil', 'note' => null, 'optional' => false, 'category' => 'oils_and_condiments'],
+    ]])]);
+    NameMatcher::fake([['matches' => [['name' => 'Scallions', 'catalog_name' => 'Green onions'], ['name' => 'Sesame oil', 'catalog_name' => null]]]]);
+
+    livewire(ListRecipes::class)
+        ->mountAction('quickAddRecipe')
+        ->fillForm(['note' => 'Scallion pancakes'])
+        ->goToNextWizardStep()
+        ->assertSchemaStateSet(fn (array $state): bool => $state['ingredients'][0]['suggestion'] === 'Green onions'
+            && $state['ingredients'][1]['suggestion'] === null)
+        ->callAction(TestAction::make('useSuggestion')->schemaComponent('ingredients.0.name'))
+        ->assertSchemaStateSet(fn (array $state): bool => $state['ingredients'][0]['name'] === 'Green onions')
+        ->callMountedAction()
+        ->assertHasNoFormErrors();
+
+    expect(Recipe::sole()->ingredients->pluck('ingredient_id')->first())->toBe($greenOnions->id)
+        ->and(Ingredient::query()->pluck('name')->all())->toEqualCanonicalizing(['Green onions', 'Sesame oil']);
 });

@@ -1,6 +1,7 @@
 <?php
 
 use App\Ai\Agents\KitchenUpdateReader;
+use App\Ai\Agents\NameMatcher;
 use App\Ai\Agents\PhotoReader;
 use App\Enums\StockLevel;
 use App\Enums\StorageLocation;
@@ -11,6 +12,7 @@ use App\Models\InventoryItem;
 use App\Models\Purchase;
 use App\Models\ShoppingListItem;
 use App\Models\Store;
+use Filament\Actions\Testing\TestAction;
 use Filament\Notifications\Notification;
 use Laravel\Ai\Prompts\AgentPrompt;
 
@@ -205,4 +207,31 @@ it('needs an API key', function () {
 
 it('is on the dashboard', function () {
     livewire(Dashboard::class)->assertActionEnabled('quickUpdate');
+});
+
+it('suggests the catalog ingredient a new name may mean, but not for what is needed', function () {
+    Ingredient::factory()->create(['name' => 'Green onions']);
+    KitchenUpdateReader::fake([[
+        'changes' => [
+            readerChange(['ingredient' => 'Scallions', 'quantity' => '1 bunch', 'category' => 'produce']),
+            readerChange(['kind' => 'need', 'ingredient' => 'Coriander', 'quantity' => null]),
+        ],
+        'not_understood' => [],
+    ]]);
+    NameMatcher::fake([['matches' => [['name' => 'Scallions', 'catalog_name' => 'Green onions']]]]);
+
+    livewire(ManageInventoryItems::class)
+        ->mountAction('quickUpdate')
+        ->fillForm(['note' => 'Bought scallions, need coriander'])
+        ->goToNextWizardStep()
+        ->assertSchemaStateSet(fn (array $state): bool => $state['changes'][0]['suggestion'] === 'Green onions'
+            && $state['changes'][1]['suggestion'] === null)
+        ->callAction(TestAction::make('useSuggestion')->schemaComponent('changes.0.ingredient'))
+        ->callMountedAction()
+        ->assertHasNoFormErrors();
+
+    NameMatcher::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains('- Scallions') && ! $prompt->contains('Coriander'));
+
+    expect(Ingredient::query()->named('Green onions')->sole()->inventoryItems)->toHaveCount(1)
+        ->and(Ingredient::query()->named('Scallions')->exists())->toBeFalse();
 });

@@ -20,6 +20,8 @@ use Illuminate\Validation\Rule;
  */
 trait TakesRecipes
 {
+    use ChecksNewIngredients;
+
     /**
      * @return array<string, mixed>
      */
@@ -66,6 +68,7 @@ trait TakesRecipes
             'steps' => ['nullable', 'array', 'max:100'],
             'steps.*' => ['string', 'max:5000'],
             'notes' => ['nullable', 'string', 'max:5000'],
+            ...$this->newIngredientRules(),
         ];
     }
 
@@ -85,7 +88,7 @@ trait TakesRecipes
         return match (true) {
             $draft->isEmpty() => 'A recipe needs ingredients or steps. Nothing was saved.',
             count($draft->substitutes) < count($validated['substitutes'] ?? []) => 'Each substitute\'s instead_of must name one of the recipe\'s ingredients exactly as written in ingredients. Nothing was saved.',
-            default => $draft,
+            default => $this->newIngredientsToCheck($draft->ingredientNames(), array_values($validated['new_ingredients'] ?? [])) ?? $draft,
         };
     }
 
@@ -162,6 +165,7 @@ trait TakesRecipes
                 ->description('The method, one step per entry, in the recipe\'s own words.'),
             'notes' => $schema->string()
                 ->description('Tips that aren\'t steps: "Freezes well".'),
+            'new_ingredients' => $this->newIngredientsSchema($schema),
         ];
     }
 }

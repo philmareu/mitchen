@@ -1,5 +1,6 @@
 <?php
 
+use App\Ai\Agents\NameMatcher;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -7,6 +8,8 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
+    // The name matcher finds nothing unless a test fakes it with matches.
+    ->beforeEach(fn () => NameMatcher::fake(fn (): array => ['matches' => []]))
     ->in('Feature');
 
 function actingAsCook(): User

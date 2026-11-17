@@ -3,6 +3,7 @@
 namespace App\Filament\Actions;
 
 use App\Actions\ReviseRecipe;
+use App\Actions\SuggestCatalogNames;
 use App\Actions\UpdateRecipe;
 use App\Ai\Agents\RecipeReviser;
 use App\Filament\Resources\Recipes\RecipeResource;
@@ -141,6 +142,6 @@ class UpdateRecipeFromNotesAction extends Action
             throw new Halt;
         }
 
-        RecipeResource::fillDraft($set, $draft);
+        RecipeResource::fillDraft($set, $draft, app(SuggestCatalogNames::class)->handle($draft->ingredientNames()));
     }
 }

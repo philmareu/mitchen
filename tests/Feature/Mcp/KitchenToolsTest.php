@@ -212,3 +212,28 @@ it('rejects a change of an unknown kind', function () {
         ])
         ->assertHasErrors(['The selected changes.0.kind is invalid.']);
 });
+
+it('asks before adding an ingredient whose name is close to one in the catalog, but not for a need', function () {
+    Ingredient::factory()->create(['name' => 'Cilantro']);
+    Ingredient::factory()->create(['name' => 'Yellow onions']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateKitchen::class, ['changes' => [
+            ['kind' => 'bought', 'ingredient' => 'cilantor', 'quantity' => '1 bunch'],
+            ['kind' => 'need', 'ingredient' => 'Red onion'],
+        ]])
+        ->assertHasErrors(['cilantor (the catalog has Cilantro). Ask the cook']);
+
+    expect(Ingredient::count())->toBe(2)
+        ->and(ShoppingListItem::count())->toBe(0);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateKitchen::class, ['changes' => [
+            ['kind' => 'bought', 'ingredient' => 'Cilantro', 'quantity' => '1 bunch'],
+            ['kind' => 'need', 'ingredient' => 'Red onion'],
+        ]])
+        ->assertOk();
+
+    expect(Ingredient::count())->toBe(2)
+        ->and(ShoppingListItem::sole()->name)->toBe('Red onion');
+});
