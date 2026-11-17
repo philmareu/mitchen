@@ -42,12 +42,27 @@ it('lists what\'s to buy, with what\'s at home and the last price, and what\'s i
                 ->where('aisle', 'dairy_and_eggs')
                 ->where('at_home.0.quantity', 'Low')
                 ->where('at_home.0.location', 'fridge')
-                ->where('last_paid', '$0.33 each (Costco, Oct 28)'))
+                ->where('last_paid', '$0.33 each (Costco, Oct 28)')
+                ->where('find_online', []))
             ->where('to_buy.1.id', $towels->id)
             ->where('to_buy.1.at_home', [])
             ->where('to_buy.1.last_paid', null)
             ->has('in_cart', 1)
             ->where('in_cart.0.name', 'Limes'));
+});
+
+it('links what\'s to buy to the online shop of each store that has one', function () {
+    Store::factory()->online('https://shop.example.com/search?q=milk')->create(['name' => 'Corner Market']);
+    Store::factory()->create(['name' => 'Costco']);
+    ShoppingListItem::factory()->create(['name' => 'Chicken thighs']);
+    ShoppingListItem::factory()->bought()->create(['name' => 'Limes']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(GetShoppingList::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json
+            ->where('to_buy.0.find_online', [['store' => 'Corner Market', 'url' => 'https://shop.example.com/search?q=Chicken%20thighs']])
+            ->has('in_cart.0', fn (AssertableJson $limes) => $limes->where('name', 'Limes')->missing('find_online')->etc()));
 });
 
 it('adds to the shopping list once, in the catalog\'s spelling and aisle', function () {

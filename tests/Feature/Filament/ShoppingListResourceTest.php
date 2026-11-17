@@ -9,6 +9,8 @@ use App\Models\Ingredient;
 use App\Models\InventoryItem;
 use App\Models\Purchase;
 use App\Models\ShoppingListItem;
+use App\Models\Store;
+use Filament\Actions\Testing\TestAction;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Arr;
 
@@ -132,4 +134,35 @@ it('records where you shopped and what it cost when putting away', function () {
     expect(Purchase::sole())
         ->store->name->toBe('Trader Joe\'s')
         ->total->toBe(4.29);
+});
+
+it('looks up what\'s still to buy in a store\'s online shop', function () {
+    $store = Store::factory()->online('https://shop.example.com/search?q=milk')->create(['name' => 'Corner Market']);
+    $entry = ShoppingListItem::factory()->create(['name' => 'Chicken thighs']);
+    $inCart = ShoppingListItem::factory()->bought()->create();
+
+    $this->get('/shopping-list')->assertOk()->assertSee('Find at Corner Market');
+
+    livewire(ManageShoppingListItems::class)
+        ->assertActionHasUrl(TestAction::make("findAt{$store->id}")->table($entry), 'https://shop.example.com/search?q=Chicken%20thighs')
+        ->assertActionShouldOpenUrlInNewTab(TestAction::make("findAt{$store->id}")->table($entry))
+        ->assertActionHidden(TestAction::make("findAt{$store->id}")->table($inCart));
+});
+
+it('looks things up in every store that has an online shop', function () {
+    $corner = Store::factory()->online('https://corner.example.com/search?q=milk')->create();
+    $market = Store::factory()->online('https://market.example.com/s?k=milk')->create();
+    $entry = ShoppingListItem::factory()->create(['name' => 'Eggs']);
+
+    livewire(ManageShoppingListItems::class)
+        ->assertActionHasUrl(TestAction::make("findAt{$corner->id}")->table($entry), 'https://corner.example.com/search?q=Eggs')
+        ->assertActionHasUrl(TestAction::make("findAt{$market->id}")->table($entry), 'https://market.example.com/s?k=Eggs');
+});
+
+it('has nowhere to look things up for a store without an online shop', function () {
+    $store = Store::factory()->create();
+    $entry = ShoppingListItem::factory()->create();
+
+    livewire(ManageShoppingListItems::class)
+        ->assertActionDoesNotExist(TestAction::make("findAt{$store->id}")->table($entry));
 });

@@ -8,7 +8,10 @@ use App\Models\Builders\ShoppingListItemBuilder;
 use App\Models\Ingredient;
 use App\Models\InventoryItem;
 use App\Models\ShoppingListItem;
+use App\Models\Store;
 use BackedEnum;
+use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Select;
@@ -23,7 +26,9 @@ use Filament\Tables\Table;
 
 /**
  * What to get on the next shop, grouped by aisle. Ticked off in the store, then put away
- * into the inventory; a receipt photo through Quick update does both at once.
+ * into the inventory; a receipt photo through Quick update does both at once. Ordering online
+ * works the same way: find each thing in the store's online shop, add it to the cart there and
+ * tick it off here.
  */
 class ShoppingListItemResource extends Resource
 {
@@ -101,9 +106,40 @@ class ShoppingListItemResource extends Resource
             // No bulk actions: their selection checkboxes would sit right beside "Got it".
             // "Put away what you got" on the page takes ticked items off in one go.
             ->recordActions([
+                ...self::findOnlineActions(),
                 EditAction::make(),
                 DeleteAction::make(),
             ]);
+    }
+
+    /**
+     * A link for each store with an online shop that looks the entry up there, in a new tab.
+     * Several stores share one menu. Nothing to find once it's ticked off (in the cart).
+     *
+     * @return list<Action|ActionGroup>
+     */
+    private static function findOnlineActions(): array
+    {
+        $actions = Store::query()->online()->orderBy('name')->get()
+            ->filter(fn (Store $store): bool => $store->shopsOnline())
+            ->map(fn (Store $store): Action => Action::make("findAt{$store->id}")
+                ->label("Find at {$store->name}")
+                ->icon(Heroicon::OutlinedMagnifyingGlass)
+                ->color('gray')
+                ->hidden(fn (ShoppingListItem $record): bool => $record->bought_at !== null)
+                ->url(fn (ShoppingListItem $record): ?string => $store->searchUrl($record->name), shouldOpenInNewTab: true))
+            ->values();
+
+        if ($actions->count() < 2) {
+            return $actions->all();
+        }
+
+        return [
+            ActionGroup::make($actions->all())
+                ->label('Find online')
+                ->icon(Heroicon::OutlinedMagnifyingGlass)
+                ->color('gray'),
+        ];
     }
 
     /**

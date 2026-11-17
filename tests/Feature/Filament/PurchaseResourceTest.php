@@ -100,3 +100,24 @@ it('keeps the purchases of a deleted store', function () {
 
     expect($purchase->fresh())->store_id->toBeNull();
 });
+
+it('saves the address of a store\'s online shop', function () {
+    $store = Store::factory()->create();
+
+    livewire(ManageStores::class)
+        ->callAction(TestAction::make('edit')->table($store), data: ['search_url' => 'https://shop.example.com/search?q=milk'])
+        ->assertHasNoFormErrors();
+
+    expect($store->fresh())->search_url->toBe('https://shop.example.com/search?q=milk')
+        ->shopsOnline()->toBeTrue();
+});
+
+it('rejects an online shop address that isn\'t a search for milk', function () {
+    $store = Store::factory()->create();
+
+    livewire(ManageStores::class)
+        ->callAction(TestAction::make('edit')->table($store), data: ['search_url' => 'https://shop.example.com/home'])
+        ->assertHasFormErrors(['search_url']);
+
+    expect($store->fresh()->search_url)->toBeNull();
+});
