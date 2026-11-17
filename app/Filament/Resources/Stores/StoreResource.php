@@ -6,6 +6,7 @@ use App\Filament\Resources\Purchases\PurchaseResource;
 use App\Filament\Resources\Stores\Pages\ManageStores;
 use App\Models\Store;
 use BackedEnum;
+use Closure;
 use Filament\Actions\Action;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
@@ -20,7 +21,8 @@ use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Where the cook shops, with how often and how much. Stores are added by hand or the first
- * time a receipt or note names one.
+ * time a receipt or note names one. One with an online shop gets "Find at…" links on the
+ * shopping list.
  */
 class StoreResource extends Resource
 {
@@ -42,6 +44,17 @@ class StoreResource extends Resource
                 Textarea::make('notes')
                     ->rows(3)
                     ->placeholder('Good for bulk rice, closed Mondays…'),
+                TextInput::make('search_url')
+                    ->label('Online shop')
+                    ->url()
+                    ->maxLength(2048)
+                    ->placeholder('https://shop.example.com/search?q=milk')
+                    ->rule(fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
+                        if (! (new Store(['search_url' => $value]))->shopsOnline()) {
+                            $fail('Search the store\'s site for "milk" and paste the address of the results, so Mitchen can see where a search goes.');
+                        }
+                    })
+                    ->helperText('To order from this store online, search its site for milk and paste the address of the results. Everything on the shopping list then gets a link that looks it up there.'),
             ])
             ->columns(1);
     }
@@ -62,6 +75,10 @@ class StoreResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->description(fn (Store $record): ?string => $record->notes),
+                TextColumn::make('search_url')
+                    ->label('Online shop')
+                    ->formatStateUsing(fn (string $state): string => (string) parse_url($state, PHP_URL_HOST))
+                    ->placeholder('—'),
                 TextColumn::make('purchases_count')
                     ->label('Trips')
                     ->numeric()

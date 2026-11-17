@@ -17,4 +17,12 @@ class StoreBuilder extends Builder
     {
         return $this->whereRaw('lower(name) = ?', [mb_strtolower(trim($name))]);
     }
+
+    /**
+     * Stores with an online shop to order from.
+     */
+    public function online(): static
+    {
+        return $this->whereNotNull('search_url');
+    }
 }
