@@ -187,6 +187,35 @@ final readonly class Quantity implements Stringable
     }
 
     /**
+     * Treating this quantity as a stock target, how much more it takes to get there from stock
+     * made up of these quantities, in this one's unit ("10 lb" with "1½ lb" and "8 oz" on hand
+     * is "8 lb"). Null when it isn't an amount or there's that much already.
+     *
+     * Only amounts that convert to its unit are taken off: there's no telling how much a "low"
+     * jar or "1 bag" comes to. Containers and plain counts round up to whole ones.
+     *
+     * @param  iterable<self>  $onHand
+     */
+    public function missingFrom(iterable $onHand): ?self
+    {
+        if ($this->amount === null) {
+            return null;
+        }
+
+        $missing = $this->amount;
+
+        foreach ($onHand as $quantity) {
+            $missing -= $quantity->amountIn($this->unit) ?? 0;
+        }
+
+        if (! $this->unit?->isMeasure()) {
+            $missing = ceil($missing - 0.0001);
+        }
+
+        return $missing > 0.0001 ? self::of($missing, $this->unit) : null;
+    }
+
+    /**
      * The quantity as a person would say it. Also round-trips through parse().
      */
     public function format(): string

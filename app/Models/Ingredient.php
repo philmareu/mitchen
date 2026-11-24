@@ -19,13 +19,15 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use InvalidArgumentException;
 
 /**
  * Something you cook with. Core ingredients are staples you always keep on hand;
  * the rest are one-offs bought for a particular recipe.
  *
  * A core ingredient goes on the restock list when what's on hand gets down to its
- * restock point ("¼ jar", "2 cans", "out"), or by default when it's low or out.
+ * restock point ("¼ jar", "2 cans", "out"), or by default when it's low or out. Its stock target
+ * ("10 lb", "4 cans") is how much to stock up to, which says how much to buy when restocking.
  *
  * Some are always on hand and never tracked, like tap water: recipes count them as there.
  * Water and ice start out that way.
@@ -35,7 +37,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
  *
  * @property list<int>|null $season
  */
-#[Fillable(['name', 'category', 'is_core', 'always_on_hand', 'sourcing', 'lead_days', 'season', 'restock_point', 'notes'])]
+#[Fillable(['name', 'category', 'is_core', 'always_on_hand', 'sourcing', 'lead_days', 'season', 'restock_point', 'stock_target', 'notes'])]
 #[UseEloquentBuilder(IngredientBuilder::class)]
 class Ingredient extends Model
 {
@@ -82,6 +84,8 @@ class Ingredient extends Model
             'restock_amount' => 'float',
             'restock_unit' => Unit::class,
             'restock_level' => StockLevel::class,
+            'target_amount' => 'float',
+            'target_unit' => Unit::class,
         ];
     }
 
@@ -124,6 +128,50 @@ class Ingredient extends Model
         return $this->is_core && $this->restock_point->isReachedBy(
             $this->inventoryItems->map(fn (InventoryItem $item): Quantity => $item->quantity),
         );
+    }
+
+    /**
+     * How much to buy to be back at the stock target, counting what's on hand that can be
+     * measured against it (Quantity::missingFrom()). Null for a one-off, without a target, or
+     * when there's that much already.
+     */
+    public function restockAmount(): ?Quantity
+    {
+        if (! $this->is_core) {
+            return null;
+        }
+
+        return $this->stock_target->missingFrom(
+            $this->inventoryItems->map(fn (InventoryItem $item): Quantity => $item->quantity),
+        );
+    }
+
+    /**
+     * Why a restock point can't be used, or null when it can. "Full" would put the ingredient
+     * on the restock list whenever any of it was opened.
+     */
+    public static function restockPointProblem(Quantity $point): ?string
+    {
+        return $point->level === StockLevel::Full
+            ? 'That would keep it on the restock list all the time. Try "about half", an amount, or leave it blank.'
+            : null;
+    }
+
+    /**
+     * Why a stock target can't be used with a restock point, or null when it can. It has to be
+     * an amount ("out", or none at all, is no target), and more than an amount it's restocked at.
+     */
+    public static function stockTargetProblem(Quantity $target, Quantity $restockPoint): ?string
+    {
+        if ($target->level !== null && $target->level !== StockLevel::Out) {
+            return 'That doesn\'t say how much to buy. Try an amount such as "10 lb", "4 cans" or "a dozen".';
+        }
+
+        $comparable = $restockPoint->isMeasured() ? $target->amountIn($restockPoint->unit) : null;
+
+        return $comparable !== null && $comparable <= $restockPoint->amount + 0.0001
+            ? "That's no more than the restock point ({$restockPoint->format()}), so there would never be anything to buy."
+            : null;
     }
 
     /**
@@ -261,5 +309,34 @@ class Ingredient extends Model
                 ];
             },
         );
+    }
+
+    /**
+     * How much to stock up to: always an amount, in two columns. Unknown means no target, and so
+     * does "out" or zero, so it's read back from the columns rather than cached as it was set.
+     *
+     * @return Attribute<Quantity, Quantity|string|null>
+     */
+    protected function stockTarget(): Attribute
+    {
+        return Attribute::make(
+            get: fn (mixed $value, array $attributes): Quantity => Quantity::fromStorage(
+                $attributes['target_amount'] ?? null,
+                isset($attributes['target_unit']) ? Unit::from($attributes['target_unit']) : null,
+                null,
+            ),
+            set: function (Quantity|string|null $value): array {
+                $target = Quantity::from($value);
+
+                if ($target->level !== null && $target->level !== StockLevel::Out) {
+                    throw new InvalidArgumentException('A stock target has to be an amount, not a stock level.');
+                }
+
+                return [
+                    'target_amount' => $target->amount,
+                    'target_unit' => $target->unit?->value,
+                ];
+            },
+        )->withoutObjectCaching();
     }
 }

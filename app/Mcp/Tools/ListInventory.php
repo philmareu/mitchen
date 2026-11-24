@@ -17,7 +17,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('The ingredient catalog with what\'s on hand: for each ingredient, every item in the kitchen with its id, quantity, place and use-by date (an ingredient with no items isn\'t stocked). Core ingredients are staples the cook always keeps. Use these names and item ids in update-kitchen.')]
+#[Description('The ingredient catalog with what\'s on hand: for each ingredient, every item in the kitchen with its id, quantity, place and use-by date (an ingredient with no items isn\'t stocked). Core ingredients are staples the cook always keeps: restock_point is when one goes on the restock list (null = when it\'s low or out) and stock_target how much the cook stocks up to (null = not set). Use these names and item ids in update-kitchen.')]
 #[IsReadOnly]
 class ListInventory extends Tool
 {

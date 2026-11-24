@@ -104,6 +104,22 @@ it('adds the restock list to the shopping list', function () {
     expect(ShoppingListItem::query()->pluck('name')->all())->toBe(['Rice']);
 });
 
+it('adds the restock list with how much to buy to be back at the stock target', function () {
+    $beans = Ingredient::factory()->core()->create(['name' => 'Pinto beans', 'restock_point' => '2 lb', 'stock_target' => '10 lb']);
+    InventoryItem::factory()->for($beans)->create(['quantity' => '2 lb']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(AddToShoppingList::class, ['restock_list' => true])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json
+            ->has('on_the_list', 1)
+            ->where('on_the_list.0.name', 'Pinto beans')
+            ->where('on_the_list.0.quantity', '8 lb')
+            ->etc());
+
+    expect(ShoppingListItem::sole()->quantity)->toBe('8 lb');
+});
+
 it('takes entries off the shopping list', function () {
     $towels = ShoppingListItem::factory()->create(['name' => 'Paper towels']);
     $limes = ShoppingListItem::factory()->bought()->create(['name' => 'Limes']);

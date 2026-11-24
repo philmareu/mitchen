@@ -13,6 +13,7 @@ use App\Mcp\Tools\LogCook;
 use App\Mcp\Tools\RecipeHistory;
 use App\Mcp\Tools\RemoveFromShoppingList;
 use App\Mcp\Tools\RestockList;
+use App\Mcp\Tools\UpdateIngredient;
 use App\Mcp\Tools\UpdateKitchen;
 use App\Mcp\Tools\UpdateRecipe;
 use App\Mcp\Tools\UseSoon;
@@ -28,6 +29,7 @@ use Laravel\Mcp\Server\Attributes\Version;
     Mitchen is the cook's kitchen assistant: the ingredients they keep and how much of each is on hand and where, the shopping list, their recipes and their equipment. Everyone who signs in shares the one kitchen.
 
     - Core ingredients are staples the cook always keeps: when one runs low or out it goes on the restock list (`restock-list`). Other ingredients are one-offs for a recipe and are removed once used up.
+    - A core ingredient can have a restock point (when it goes on the restock list, instead of low or out) and a stock target (how much the cook stocks up to: "10 lb", "4 cans"). With a target, `restock-list` says how much to buy (`to_buy`) and the shopping list fills that in. When the cook wants to keep more or less of something, or makes something a staple, set it with `update-ingredient`.
     - Quantities are text, written the way people say them: "2 lb", "1 1/2 cups", "half a jar", "3 cans", "a dozen", "6", or a level: "full", "half", "low", "out". Mitchen reads them and says so when it can't.
     - Places: pantry, fridge, freezer, spice_rack, counter.
     - To change what's on hand or the shopping list, work out the changes, read them back to the cook as a short list, and call `update-kitchen` once they agree. Nothing changes until then. Use the catalog's names (`list-inventory`); a new name is added as a one-off ingredient.
@@ -50,6 +52,7 @@ class MitchenServer extends Server
         ListEquipment::class,
         AddEquipment::class,
         UpdateKitchen::class,
+        UpdateIngredient::class,
         AddToShoppingList::class,
         RemoveFromShoppingList::class,
         AddRecipe::class,

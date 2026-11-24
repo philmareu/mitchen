@@ -249,6 +249,7 @@ class ReadKitchenUpdate
             $tags = collect([
                 $ingredient->is_core ? 'core' : null,
                 $ingredient->is_core && ! $ingredient->restock_point->isUnknown() ? 'restock at '.$ingredient->restock_point->format() : null,
+                $ingredient->is_core && ! $ingredient->stock_target->isUnknown() ? 'stock up to '.$ingredient->stock_target->format() : null,
             ])->filter()->join(', ');
 
             return sprintf(

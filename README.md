@@ -10,7 +10,7 @@ Your recipes live alongside it, so each one shows what's on hand, what's missing
 
 - **Write quantities the way you'd say them.** One box takes exact amounts (`500g`, `1 1/2 cups`, `1½ cups`), containers (`half a jar`, `3 cans`, `two thirds of a bag`) or a rough level (`plenty`, `about half`, `running low`, `out`). The form shows what it understood as you type, and stores the result as structured data.
 - **Core vs. one-off ingredients.** Mark the staples you always keep on hand. When a core ingredient is used up it stays in your inventory as *out* and goes on the restock list. A one-off bought for a single recipe just disappears.
-- **Restock list, with restock points.** Core ingredients that are low, out, or not stocked at all, with a one-click "Restocked" that records what you bought. Give an ingredient its own restock point (`¼ jar`, `2 cans`, `1 lb`, or `out`) and it goes on the list when what you have adds up to that, converting between units (`12 oz` counts against `1 lb`).
+- **Restock list, with restock points.** Core ingredients that are low, out, or not stocked at all, with a one-click "Restocked" that records what you bought. Give an ingredient its own restock point (`¼ jar`, `2 cans`, `1 lb`, or `out`) and it goes on the list when what you have adds up to that, converting between units (`12 oz` counts against `1 lb`). Say how much you like to stock up to (`10 lb`, `4 cans`) and the list works out how much to buy: 10 lb less the 2 lb in the pantry is 8 lb, filled in when it goes on the shopping list.
 - **Shopping list.** Grouped by aisle, with what you already have at home under each item. Bring in everything on the restock list in one click, add your own items, tick things off in the store, then put away what you got: check how much and where, and it's added to the inventory and comes off the list.
 - **Order online.** Give a store the address of its online shop (search it for milk and paste the address) and everything on the shopping list gets a link that looks it up there. Find it, add it to the store's cart, tick it off, and put it away when the order arrives. It works with any shop that has a search box, the local grocer's included.
 - **Purchase history and prices.** Every shop is recorded with its store, date, total and what each thing cost: scan the receipt, put away what you ticked off, or add one by hand. See what you spent this month, which store you shop at most, and what you last paid per unit (`$3.49/lb`, `$0.33 each`) right on the shopping list.
@@ -51,7 +51,7 @@ Quick update and photo reading use the [Laravel AI SDK](https://github.com/larav
 
 ## Connecting Claude
 
-Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list, new recipes, the cook log, revisions from your notes, previewed before they're saved, and equipment you forgot to list, so recipes that need it count it as there), using the same actions as the app. Claude does the understanding on its side, so these calls don't use your `ANTHROPIC_API_KEY`.
+Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list, how much of a staple to keep, new recipes, the cook log, revisions from your notes, previewed before they're saved, and equipment you forgot to list, so recipes that need it count it as there), using the same actions as the app. Claude does the understanding on its side, so these calls don't use your `ANTHROPIC_API_KEY`.
 
 The shopping list comes with a link into each store's online shop for everything on it, so a Claude that can use your browser can fill the cart there and read it back to you. Checking out stays with you.
 
@@ -87,6 +87,7 @@ Units cover weights, volumes and the containers food comes in (jar, can, bottle,
 - [x] Recipes sorted by cuisine, course, main protein, diet and your own tags
 - [x] Equipment, added from photos or a note
 - [x] Restock points and a shopping list built from the restock list
+- [x] Stock targets: how much of a staple to keep, so the restock list says how much to buy
 - [ ] Meal planning, adding to the shopping list from the plan
 - [x] Quick updates in plain language ("bought 2 lbs chicken, out of milk, need eggs"), reviewed before saving
 - [x] Grocery receipt photos that tick off the shopping list

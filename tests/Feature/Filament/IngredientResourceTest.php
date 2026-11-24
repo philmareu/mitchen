@@ -57,6 +57,35 @@ it('rejects a restock point it cannot use', function (string $point) {
         ->assertHasFormErrors(['restock_point']);
 })->with(['full', '2 sleeves']);
 
+it('sets a stock target on a core ingredient', function () {
+    $ingredient = Ingredient::factory()->core()->create(['name' => 'Pinto beans']);
+
+    livewire(ManageIngredients::class)
+        ->callAction(TestAction::make('edit')->table($ingredient), data: ['restock_point' => '2 lb', 'stock_target' => '10 pounds'])
+        ->assertHasNoFormErrors()
+        ->assertTableColumnStateSet('stock_target', '10 lb', $ingredient);
+
+    expect((string) $ingredient->fresh()->stock_target)->toBe('10 lb');
+
+    livewire(ManageIngredients::class)
+        ->mountAction(TestAction::make('edit')->table($ingredient))
+        ->assertSchemaStateSet(['stock_target' => '10 lb']);
+});
+
+it('rejects a stock target it cannot use', function (string $target) {
+    $ingredient = Ingredient::factory()->core()->create(['restock_point' => '2 lb']);
+
+    livewire(ManageIngredients::class)
+        ->callAction(TestAction::make('edit')->table($ingredient), data: ['stock_target' => $target])
+        ->assertHasFormErrors(['stock_target']);
+
+    expect($ingredient->fresh()->stock_target->isUnknown())->toBeTrue();
+})->with([
+    'a stock level' => ['full'],
+    'no more than the restock point' => ['32 oz'],
+    'a unit it does not know' => ['2 sleeves'],
+]);
+
 it('does not allow duplicate names', function () {
     Ingredient::factory()->create(['name' => 'Olive oil']);
 

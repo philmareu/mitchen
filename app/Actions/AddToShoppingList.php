@@ -14,6 +14,9 @@ class AddToShoppingList
     /**
      * Put something on the list once: if it's already there and not bought yet, that entry is
      * kept (with the new quantity, when one is given) rather than added twice.
+     *
+     * With no quantity given or on the entry, a core ingredient with a stock target gets what
+     * it takes to be back at it (Ingredient::restockAmount()).
      */
     public function handle(Ingredient|string $item, ?string $quantity = null, ?IngredientCategory $category = null): ShoppingListItem
     {
@@ -26,8 +29,13 @@ class AddToShoppingList
             ->first()
             ?? new ShoppingListItem(['name' => $name, 'category' => $category ?? IngredientCategory::Other]);
 
-        if ($quantity !== null || ! $entry->exists) {
-            $entry->quantity = $quantity ?? $entry->quantity;
+        if ($quantity === null && blank($entry->quantity)) {
+            $ingredient = $item instanceof Ingredient ? $item : Ingredient::query()->named($name)->first();
+            $quantity = $ingredient?->restockAmount()?->format();
+        }
+
+        if ($quantity !== null) {
+            $entry->quantity = $quantity;
         }
 
         $entry->save();
@@ -61,6 +69,7 @@ class AddToShoppingList
         return Ingredient::query()
             ->needsRestock()
             ->notOnShoppingList()
+            ->with('inventoryItems')
             ->orderBy('name')
             ->get()
             ->map(fn (Ingredient $ingredient): string => $this->handle($ingredient)->name)

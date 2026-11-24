@@ -106,3 +106,33 @@ it('stores a restock point like a quantity', function () {
 
     expect($ingredient->fresh()->restock_point->isUnknown())->toBeTrue();
 });
+
+it('stores a stock target as an amount', function () {
+    $ingredient = Ingredient::factory()->core()->create(['stock_target' => '10 pounds']);
+
+    $this->assertDatabaseHas('ingredients', [
+        'id' => $ingredient->id,
+        'target_amount' => 10,
+        'target_unit' => 'lb',
+    ]);
+
+    expect((string) $ingredient->fresh()->stock_target)->toBe('10 lb');
+
+    $ingredient->update(['stock_target' => 'none']);
+
+    expect($ingredient->fresh()->stock_target->isUnknown())->toBeTrue();
+});
+
+it('refuses a stock level as a stock target', function () {
+    Ingredient::factory()->core()->create(['stock_target' => 'full']);
+})->throws(InvalidArgumentException::class, 'A stock target has to be an amount');
+
+it('says how much to buy to be back at a core ingredient\'s stock target', function () {
+    $beans = Ingredient::factory()->core()->has(InventoryItem::factory()->quantity('2 lb'))->create(['stock_target' => '10 lb']);
+    $noTarget = Ingredient::factory()->core()->has(InventoryItem::factory()->quantity('2 lb'))->create();
+    $oneOff = Ingredient::factory()->has(InventoryItem::factory()->quantity('2 lb'))->create(['stock_target' => '10 lb']);
+
+    expect($beans->restockAmount()?->format())->toBe('8 lb')
+        ->and($noTarget->restockAmount())->toBeNull()
+        ->and($oneOff->restockAmount())->toBeNull();
+});
