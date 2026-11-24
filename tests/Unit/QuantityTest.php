@@ -88,3 +88,23 @@ it('knows when stock is down to a restock point', function (?string $point, arra
     'at half: about half' => ['about half', ['about half'], true],
     'at half: full' => ['about half', ['full'], false],
 ]);
+
+it('works out how much it takes to get back to a stock target', function (string $target, array $onHand, ?string $missing) {
+    $onHand = array_map(Quantity::parse(...), $onHand);
+
+    expect(Quantity::parse($target)->missingFrom($onHand)?->format())->toBe($missing);
+})->with([
+    'nothing on hand' => ['10 lb', [], '10 lb'],
+    'out' => ['10 lb', ['out'], '10 lb'],
+    'less what is on hand' => ['10 lb', ['2 lb'], '8 lb'],
+    'amounts in other units convert' => ['10 lb', ['1½ lb', '8 oz'], '8 lb'],
+    'a part of a pound stays' => ['10 lb', ['12 oz'], '9¼ lb'],
+    'a level is not taken off' => ['2 jars', ['low'], '2 jars'],
+    'an amount that can\'t be compared is not taken off' => ['10 lb', ['1 bag'], '10 lb'],
+    'containers round up to whole ones' => ['2 jars', ['¼ jar'], '2 jars'],
+    'counts round up to whole ones' => ['12', ['4½'], '8'],
+    'that much already' => ['4 cans', ['4 cans'], null],
+    'more than that already' => ['1 lb', ['24 oz'], null],
+    'no target' => ['', ['low'], null],
+    'a level is no target' => ['full', [], null],
+]);

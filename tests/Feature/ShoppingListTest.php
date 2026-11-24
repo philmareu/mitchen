@@ -133,3 +133,26 @@ it('puts away what you got and takes it all off the list', function () {
     $this->assertModelExists($tickedLater);
     $this->assertModelExists($toBuy);
 });
+
+it('fills in how much to buy from the stock target unless a quantity is given or already there', function () {
+    $beans = Ingredient::factory()->core()->has(InventoryItem::factory()->quantity('2 lb'))->create(['name' => 'Pinto beans', 'stock_target' => '10 lb']);
+    $add = app(AddToShoppingList::class);
+
+    $byName = $add->handle('pinto beans');
+    $given = $add->handle($beans, '1 bag');
+    $again = $add->handle($beans);
+
+    expect($byName->quantity)->toBe('8 lb')
+        ->and($given->quantity)->toBe('1 bag')
+        ->and($again->quantity)->toBe('1 bag')
+        ->and(ShoppingListItem::sole()->quantity)->toBe('1 bag');
+});
+
+it('brings in the restock list with how much to buy', function () {
+    Ingredient::factory()->core()->has(InventoryItem::factory()->quantity('1 lb'))->create(['name' => 'Rice', 'restock_point' => '1 lb', 'stock_target' => '5 lb']);
+    Ingredient::factory()->core()->create(['name' => 'Salt']);
+
+    app(AddToShoppingList::class)->restockList();
+
+    expect(ShoppingListItem::query()->orderBy('name')->pluck('quantity', 'name')->all())->toBe(['Rice' => '4 lb', 'Salt' => null]);
+});

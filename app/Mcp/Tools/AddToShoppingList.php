@@ -17,7 +17,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsIdempotent;
 
-#[Description('Put things on the shopping list. Something already on it and not bought yet stays one entry, taking the new quantity when you give one. A catalog ingredient takes its catalog name and aisle; anything else (paper towels) is kept as written. Pass restock_list: true to add everything on the restock list that isn\'t on the shopping list yet.')]
+#[Description('Put things on the shopping list. Something already on it and not bought yet stays one entry, taking the new quantity when you give one. A catalog ingredient takes its catalog name and aisle; anything else (paper towels) is kept as written. A core ingredient with a stock target, added with no quantity, gets what it takes to be back at the target. Pass restock_list: true to add everything on the restock list that isn\'t on the shopping list yet.')]
 #[IsIdempotent]
 class AddToShoppingList extends Tool
 {
@@ -68,7 +68,7 @@ class AddToShoppingList extends Tool
             'items' => $schema->array()
                 ->items($schema->object([
                     'name' => $schema->string()->description('The catalog name, or a plain name ("Paper towels").')->required(),
-                    'quantity' => $schema->string()->description('How much to get, such as "2 lb" or "a dozen".'),
+                    'quantity' => $schema->string()->description('How much to get, such as "2 lb" or "a dozen". Leave out to go by the ingredient\'s stock target.'),
                     'category' => $schema->string()->enum(IngredientCategory::class)->description('The aisle, for something not in the catalog.'),
                 ]))
                 ->description('What to add.'),

@@ -14,7 +14,7 @@ use Laravel\Mcp\Server\Attributes\Description;
 use Laravel\Mcp\Server\Tool;
 use Laravel\Mcp\Server\Tools\Annotations\IsReadOnly;
 
-#[Description('Core ingredients to restock: low, out, down to their restock point, or not stocked at all. Each shows what\'s left and whether it\'s on the shopping list: "to_buy", "in_cart" (ticked off, not put away yet) or null. add-to-shopping-list with restock_list: true adds the ones that aren\'t.')]
+#[Description('Core ingredients to restock: low, out, down to their restock point, or not stocked at all. Each shows what\'s left, how much to buy to be back at its stock target (to_buy; null when the cook hasn\'t set one) and whether it\'s on the shopping list: "to_buy", "in_cart" (ticked off, not put away yet) or null. add-to-shopping-list with restock_list: true adds the ones that aren\'t, with that amount.')]
 #[IsReadOnly]
 class RestockList extends Tool
 {
@@ -34,6 +34,7 @@ class RestockList extends Tool
         return Response::structured([
             'ingredients' => $ingredients->map(fn (Ingredient $ingredient): array => [
                 ...$this->presentIngredient($ingredient),
+                'to_buy' => $ingredient->restockAmount()?->format(),
                 'shopping_list' => match (true) {
                     $ingredient->shoppingListItems->contains(fn (ShoppingListItem $entry): bool => $entry->bought_at === null) => 'to_buy',
                     $ingredient->isOnShoppingList() => 'in_cart',

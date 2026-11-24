@@ -6,6 +6,7 @@ use App\Enums\StorageLocation;
 use App\Mcp\Servers\MitchenServer;
 use App\Mcp\Tools\ListInventory;
 use App\Mcp\Tools\RestockList;
+use App\Mcp\Tools\UpdateIngredient;
 use App\Mcp\Tools\UpdateKitchen;
 use App\Mcp\Tools\UseSoon;
 use App\Models\Ingredient;
@@ -20,7 +21,7 @@ beforeEach(function () {
 });
 
 it('lists the catalog with each item on hand', function () {
-    $rice = Ingredient::factory()->core()->create(['name' => 'Jasmine rice', 'category' => IngredientCategory::GrainsAndPasta, 'restock_point' => '1 lb']);
+    $rice = Ingredient::factory()->core()->create(['name' => 'Jasmine rice', 'category' => IngredientCategory::GrainsAndPasta, 'restock_point' => '1 lb', 'stock_target' => '5 lb']);
     $item = InventoryItem::factory()->for($rice)->create(['quantity' => '2 lb', 'location' => StorageLocation::Pantry, 'expires_on' => '2027-03-01']);
     Ingredient::factory()->create(['name' => 'Saffron']);
 
@@ -34,6 +35,7 @@ it('lists the catalog with each item on hand', function () {
                 ->where('category', 'grains_and_pasta')
                 ->where('core', true)
                 ->where('restock_point', '1 lb')
+                ->where('stock_target', '5 lb')
                 ->where('needs_restock', false)
                 ->where('on_hand', [['id' => $item->id, 'quantity' => '2 lb', 'location' => 'pantry', 'use_by' => '2027-03-01', 'ripening_until' => null]])
                 ->etc())
@@ -87,6 +89,85 @@ it('lists the restock list with whether each is on the shopping list', function 
             ->where('ingredients.2.name', 'Salt')
             ->where('ingredients.2.shopping_list', 'in_cart'));
 });
+
+it('says how much of each thing on the restock list to buy to be back at its stock target', function () {
+    $beans = Ingredient::factory()->core()->create(['name' => 'Pinto beans', 'restock_point' => '2 lb', 'stock_target' => '10 lb']);
+    InventoryItem::factory()->for($beans)->create(['quantity' => '2 lb']);
+    Ingredient::factory()->core()->create(['name' => 'Salt']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(RestockList::class)
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json
+            ->has('ingredients', 2)
+            ->where('ingredients.0.name', 'Pinto beans')
+            ->where('ingredients.0.stock_target', '10 lb')
+            ->where('ingredients.0.to_buy', '8 lb')
+            ->where('ingredients.1.name', 'Salt')
+            ->where('ingredients.1.stock_target', null)
+            ->where('ingredients.1.to_buy', null));
+});
+
+it('makes an ingredient a staple with a restock point and a stock target', function () {
+    $beans = Ingredient::factory()->create(['name' => 'Pinto beans']);
+    InventoryItem::factory()->for($beans)->create(['quantity' => '2 lb']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateIngredient::class, ['ingredient' => 'pinto bean', 'core' => true, 'restock_point' => '2 lb', 'stock_target' => '10 pounds'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json
+            ->where('ingredient.name', 'Pinto beans')
+            ->where('ingredient.core', true)
+            ->where('ingredient.restock_point', '2 lb')
+            ->where('ingredient.stock_target', '10 lb')
+            ->where('ingredient.needs_restock', true));
+
+    expect($beans->fresh())
+        ->is_core->toBeTrue()
+        ->restock_point->format()->toBe('2 lb')
+        ->stock_target->format()->toBe('10 lb');
+});
+
+it('changes only the restocking settings it is given, and takes a stock target off', function () {
+    $rice = Ingredient::factory()->core()->create(['name' => 'Rice', 'restock_point' => '1 lb', 'stock_target' => '5 lb']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateIngredient::class, ['ingredient' => 'Rice', 'stock_target' => 'none'])
+        ->assertOk()
+        ->assertStructuredContent(fn (AssertableJson $json) => $json
+            ->where('ingredient.core', true)
+            ->where('ingredient.restock_point', '1 lb')
+            ->where('ingredient.stock_target', null));
+
+    expect($rice->fresh())
+        ->is_core->toBeTrue()
+        ->restock_point->format()->toBe('1 lb')
+        ->stock_target->isUnknown()->toBeTrue();
+});
+
+it('saves no restocking settings it can\'t use', function (array $arguments, string $error) {
+    Ingredient::factory()->core()->create(['name' => 'Rice', 'restock_point' => '1 lb', 'stock_target' => '5 lb']);
+    Ingredient::factory()->create(['name' => 'Saffron']);
+
+    MitchenServer::actingAs($this->cook)
+        ->tool(UpdateIngredient::class, $arguments)
+        ->assertHasErrors([$error]);
+
+    expect(Ingredient::query()->orderBy('name')->get()->map(fn (Ingredient $ingredient): array => [
+        $ingredient->name, $ingredient->is_core, $ingredient->restock_point->format(), $ingredient->stock_target->format(),
+    ])->all())->toBe([
+        ['Rice', true, '1 lb', '5 lb'],
+        ['Saffron', false, '', ''],
+    ]);
+})->with([
+    'a stock level as the target' => [['ingredient' => 'Rice', 'stock_target' => 'full'], 'Stock target "Full": That doesn\'t say how much to buy.'],
+    'a target no more than the restock point' => [['ingredient' => 'Rice', 'stock_target' => '12 oz'], 'Stock target "12 oz": That\'s no more than the restock point (1 lb)'],
+    'a restock point up at the target' => [['ingredient' => 'Rice', 'restock_point' => '5 lb'], 'Stock target "5 lb": That\'s no more than the restock point (5 lb)'],
+    'a restock point of full' => [['ingredient' => 'Rice', 'restock_point' => 'full'], 'Restock point "Full": That would keep it on the restock list all the time.'],
+    'a quantity it can\'t read' => [['ingredient' => 'Rice', 'stock_target' => '2 sleeves'], '"sleeves" isn\'t a unit Mitchen knows.'],
+    'a one-off' => [['ingredient' => 'Saffron', 'stock_target' => '2 jars'], 'Saffron isn\'t a core ingredient, so it\'s never on the restock list. Pass core: true to make it one.'],
+    'a name that isn\'t in the catalog' => [['ingredient' => 'Ryce', 'stock_target' => '5 lb'], '"Ryce" isn\'t in the catalog. It has Rice.'],
+]);
 
 it('lists what to use soon, soonest first, leaving out what\'s gone', function () {
     $this->travelTo('2026-11-02');

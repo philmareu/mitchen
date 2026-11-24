@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Ingredients;
 
 use App\Enums\IngredientCategory;
 use App\Enums\Sourcing;
-use App\Enums\StockLevel;
 use App\Filament\Resources\Ingredients\Pages\ManageIngredients;
 use App\Filament\Resources\InventoryItems\InventoryItemResource;
 use App\Models\Builders\IngredientBuilder;
@@ -83,6 +82,16 @@ class IngredientResource extends Resource
                 ->visible(fn (Get $get): bool => (bool) $get('is_core'))
                 ->rules([InventoryItemResource::quantityRule(), self::restockPointRule()])
                 ->columnSpanFull(),
+            TextInput::make('stock_target')
+                ->label('Stock up to')
+                ->placeholder('10 lb, 4 cans, a dozen…')
+                ->helperText('How much you like to have after a shop. The restock list and the shopping list then say how much to buy to get back to it. Blank leaves that up to you.')
+                ->formatStateUsing(fn (mixed $record): ?string => $record instanceof Ingredient ? ($record->stock_target->format() ?: null) : null)
+                ->live(debounce: 400)
+                ->hint(fn (?string $state): ?string => InventoryItemResource::readsAs($state))
+                ->visible(fn (Get $get): bool => (bool) $get('is_core'))
+                ->rules([InventoryItemResource::quantityRule(), self::stockTargetRule()])
+                ->columnSpanFull(),
             Toggle::make('always_on_hand')
                 ->label('Always on hand')
                 ->helperText('Never tracked and never out, like tap water or ice. Recipes count it as there.')
@@ -128,7 +137,7 @@ class IngredientResource extends Resource
     }
 
     /**
-     * "Full" would put the ingredient on the restock list whenever any of it was opened.
+     * Fails a restock point Mitchen can read but can't use (Ingredient::restockPointProblem()).
      *
      * @return Closure(): (Closure(string, mixed, Closure): void)
      */
@@ -136,13 +145,34 @@ class IngredientResource extends Resource
     {
         return fn (): Closure => function (string $attribute, mixed $value, Closure $fail): void {
             try {
-                $point = Quantity::parse($value);
+                $problem = Ingredient::restockPointProblem(Quantity::parse($value));
             } catch (UnreadableQuantity) {
                 return;
             }
 
-            if ($point->level === StockLevel::Full) {
-                $fail('That would keep it on the restock list all the time. Try "about half", an amount, or leave it blank.');
+            if ($problem !== null) {
+                $fail($problem);
+            }
+        };
+    }
+
+    /**
+     * Fails a stock target that isn't an amount, or is no more than the restock point typed
+     * above it (Ingredient::stockTargetProblem()).
+     *
+     * @return Closure(Get): (Closure(string, mixed, Closure): void)
+     */
+    public static function stockTargetRule(): Closure
+    {
+        return fn (Get $get): Closure => function (string $attribute, mixed $value, Closure $fail) use ($get): void {
+            try {
+                $problem = Ingredient::stockTargetProblem(Quantity::parse($value), Quantity::parse($get('restock_point')));
+            } catch (UnreadableQuantity) {
+                return;
+            }
+
+            if ($problem !== null) {
+                $fail($problem);
             }
         };
     }
@@ -173,6 +203,11 @@ class IngredientResource extends Resource
                 TextColumn::make('restock_point')
                     ->label('Restock at')
                     ->state(fn (Ingredient $record): ?string => $record->is_core ? ($record->restock_point->format() ?: 'Low') : null)
+                    ->placeholder('—')
+                    ->toggleable(),
+                TextColumn::make('stock_target')
+                    ->label('Stock up to')
+                    ->state(fn (Ingredient $record): ?string => $record->is_core ? ($record->stock_target->format() ?: null) : null)
                     ->placeholder('—')
                     ->toggleable(),
                 TextColumn::make('on_hand')

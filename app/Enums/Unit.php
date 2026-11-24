@@ -70,6 +70,15 @@ enum Unit: string implements HasLabel
     }
 
     /**
+     * Whether it measures a weight or a volume, which can be bought in any amount, rather than
+     * a container or a piece, which comes whole.
+     */
+    public function isMeasure(): bool
+    {
+        return $this->measure() !== null;
+    }
+
+    /**
      * An amount in this unit expressed in another, or null when they measure different things
      * (weight vs volume) or either is a container ("2 jars" only compares with jars).
      */

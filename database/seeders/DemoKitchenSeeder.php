@@ -26,7 +26,8 @@ use Illuminate\Database\Seeder;
 /**
  * A lived-in kitchen to click around: staples at every stock level, a few
  * one-off ingredients, some core items that need restocking (one by its own
- * restock point), a short shopping list, a few past shops with prices, some
+ * restock point, two with a stock target that says how much to buy), a short
+ * shopping list, a few past shops with prices, some
  * equipment (without photos), a few ingredients that take planning to get, and
  * recipes at every stage from ready to cook to needing equipment: one with a
  * substitute and a variant, one with variants, and one with a cook log and a
@@ -64,11 +65,18 @@ class DemoKitchenSeeder extends Seeder
             'Butter' => '2 sticks',
         ];
 
+        $stockTargets = [
+            'Olive oil' => '2 bottles',
+            'Jasmine rice' => '5 lb',
+            'Butter' => '6 sticks',
+        ];
+
         foreach ($kitchen as [$name, $category, $isCore, $location, $quantity, $expiresIn]) {
             $ingredient = Ingredient::firstOrCreate(['name' => $name], [
                 'category' => $category,
                 'is_core' => $isCore,
                 'restock_point' => $restockPoints[$name] ?? null,
+                'stock_target' => $stockTargets[$name] ?? null,
             ]);
 
             if ($location === null) {

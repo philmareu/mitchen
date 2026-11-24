@@ -22,7 +22,8 @@ use Livewire\Attributes\On;
 
 /**
  * Core ingredients down to their restock point (by default low, out, or missing from the
- * inventory entirely), with a way to put them on the shopping list.
+ * inventory entirely), with how much to buy for those with a stock target and a way to put
+ * them on the shopping list.
  */
 class RestockList extends TableWidget
 {
@@ -52,6 +53,7 @@ class RestockList extends TableWidget
                     ->label('Ingredient')
                     ->description(fn (Ingredient $record): ?string => collect([
                         $record->restock_point->isUnknown() ? null : 'Restock at '.$record->restock_point->format(),
+                        ($toBuy = $record->restockAmount()) === null ? null : 'Buy '.$toBuy->format(),
                         match (true) {
                             $record->shoppingListItems->contains(fn (ShoppingListItem $entry): bool => $entry->bought_at === null) => 'On the shopping list',
                             $record->isOnShoppingList() => 'Bought, not put away yet',

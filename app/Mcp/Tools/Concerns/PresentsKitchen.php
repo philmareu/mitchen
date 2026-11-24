@@ -14,7 +14,7 @@ use App\Models\ShoppingListItem;
 trait PresentsKitchen
 {
     /**
-     * @return array{name: string, category: string|null, core: bool, always_on_hand: bool, restock_point: string|null, needs_restock: bool, lead_time: string|null, on_hand: list<array<string, mixed>>}
+     * @return array{name: string, category: string|null, core: bool, always_on_hand: bool, restock_point: string|null, stock_target: string|null, needs_restock: bool, lead_time: string|null, on_hand: list<array<string, mixed>>}
      */
     protected function presentIngredient(Ingredient $ingredient): array
     {
@@ -24,6 +24,7 @@ trait PresentsKitchen
             'core' => $ingredient->is_core,
             'always_on_hand' => $ingredient->always_on_hand,
             'restock_point' => $ingredient->is_core ? ($ingredient->restock_point->format() ?: null) : null,
+            'stock_target' => $ingredient->is_core ? ($ingredient->stock_target->format() ?: null) : null,
             'needs_restock' => $ingredient->needsRestocking(),
             'lead_time' => $ingredient->leadTime(),
             'on_hand' => $ingredient->inventoryItems->map($this->presentItem(...))->values()->all(),

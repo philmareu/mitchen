@@ -22,7 +22,7 @@ use Laravel\Mcp\Server\Tool;
 #[Description(<<<'TEXT'
     Save changes to what's on hand and the shopping list, all or nothing. Read the changes back to the cook first and only call this once they agree.
 
-    Kinds: bought (new supply came in; quantity is how much), set (how much is left now: "half a bag", "low"), used_up (finished or thrown away) and need (put it on the shopping list; quantity is how much to get). Use catalog names from list-inventory; a new name is added as a one-off ingredient, except for need, which only adds a list entry. When a new name is close to a catalog one, nothing is saved: check with the cook, then use the catalog name or confirm it in new_ingredients.
+    Kinds: bought (new supply came in; quantity is how much), set (how much is left now: "half a bag", "low"), used_up (finished or thrown away) and need (put it on the shopping list; quantity is how much to get, and without one a core ingredient with a stock target gets what it takes to be back at it). Use catalog names from list-inventory; a new name is added as a one-off ingredient, except for need, which only adds a list entry. When a new name is close to a catalog one, nothing is saved: check with the cook, then use the catalog name or confirm it in new_ingredients.
 
     For set and used_up, pass the item's inventory_item_id when the ingredient is in more than one place. Without a location, a change goes where the ingredient already is, else where its aisle usually goes; a location moves the item there.
 
