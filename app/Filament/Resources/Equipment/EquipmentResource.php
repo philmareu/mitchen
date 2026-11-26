@@ -24,7 +24,7 @@ use Filament\Tables\Table;
 
 /**
  * The kitchen's equipment, from a stand mixer down to a ladle, with photos of the cook's
- * own pieces. Added by hand or read from photos with Quick add.
+ * own pieces. Added by hand, or by an assistant over the MCP server.
  */
 class EquipmentResource extends Resource
 {
@@ -78,8 +78,8 @@ class EquipmentResource extends Resource
     }
 
     /**
-     * Photos to keep, resized in the browser to the largest size Claude reads at full detail.
-     * Also used by Quick add and for recipe photos.
+     * Photos to keep, resized in the browser to 2576 px a side at most. Also used for recipe
+     * photos.
      */
     public static function photoUpload(string $name): FileUpload
     {
@@ -102,7 +102,7 @@ class EquipmentResource extends Resource
             ->defaultPaginationPageOption(50)
             ->emptyStateIcon(Heroicon::OutlinedWrenchScrewdriver)
             ->emptyStateHeading('No equipment yet')
-            ->emptyStateDescription('Snap a drawer of utensils, a shelf of pans or your stand mixer with Quick add, or add a piece by hand.')
+            ->emptyStateDescription('Add what you cook with: the stand mixer, the Dutch oven, the tortilla press.')
             ->columns([
                 ImageColumn::make('photos')
                     ->label('')

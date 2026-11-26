@@ -2,7 +2,7 @@
 
 namespace App\Mcp\Tools;
 
-use App\Actions\ReadRecipe;
+use App\Actions\PrepareRecipeDraft;
 use App\Actions\UpdateRecipe as SaveRevision;
 use App\Filament\Resources\Recipes\RecipeResource;
 use App\Mcp\Tools\Concerns\TakesRecipes;
@@ -30,7 +30,7 @@ class UpdateRecipe extends Tool
     /**
      * Handle the tool request.
      */
-    public function handle(Request $request, ReadRecipe $read, SaveRevision $save): Response|ResponseFactory
+    public function handle(Request $request, PrepareRecipeDraft $prepare, SaveRevision $save): Response|ResponseFactory
     {
         $validated = $request->validate([
             'recipe_id' => ['required', 'integer'],
@@ -51,7 +51,7 @@ class UpdateRecipe extends Tool
             return Response::error("There's already another recipe called {$other->name} (id {$other->id}). Nothing was saved.");
         }
 
-        $draft = $this->draft($validated, $read, $recipe->equipment()->pluck('name')->all());
+        $draft = $this->draft($validated, $prepare, $recipe->equipment()->pluck('name')->all());
 
         if (is_string($draft)) {
             return Response::error($draft);

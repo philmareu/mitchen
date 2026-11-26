@@ -23,16 +23,12 @@ use App\Models\RecipeEquipment;
 use App\Models\RecipeIngredient;
 use App\Models\RecipeSubstitute;
 use App\Models\RecipeVariant;
-use App\Support\Names;
-use App\Support\RecipeDraft;
 use BackedEnum;
-use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
 use Filament\Forms\Components\Checkbox;
 use Filament\Forms\Components\CheckboxList;
-use Filament\Forms\Components\Hidden;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
@@ -46,10 +42,8 @@ use Filament\Infolists\Components\RepeatableEntry\TableColumn as EntryTableColum
 use Filament\Infolists\Components\TextEntry;
 use Filament\Resources\Resource;
 use Filament\Schemas\Components\Component;
-use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Utilities\Get;
-use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\ImageColumn;
@@ -63,8 +57,8 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\HtmlString;
 
 /**
- * The cook's recipes, with what's in the kitchen for each. Added by hand or read from a
- * photo of the card with Quick add.
+ * The cook's recipes, with what's in the kitchen for each. Added by hand, or by an assistant
+ * over the MCP server.
  */
 class RecipeResource extends Resource
 {
@@ -96,12 +90,12 @@ class RecipeResource extends Resource
                 Section::make('Substitutes')
                     ->description(self::SUBSTITUTES_DESCRIPTION)
                     ->schema([
-                        self::substitutesRepeater(relationship: true),
+                        self::substitutesRepeater(),
                     ]),
                 Section::make('Variants')
                     ->description(self::VARIANTS_DESCRIPTION)
                     ->schema([
-                        self::variantsRepeater(relationship: true),
+                        self::variantsRepeater(),
                     ]),
                 Section::make('Equipment')
                     ->description('What not every kitchen has: a slow cooker, a Dutch oven, a tortilla press.')
@@ -154,11 +148,9 @@ class RecipeResource extends Resource
     }
 
     /**
-     * Also used by Quick add's review step.
-     *
      * @return list<Component>
      */
-    public static function detailFields(): array
+    private static function detailFields(): array
     {
         return [
             TextInput::make('name')
@@ -203,67 +195,9 @@ class RecipeResource extends Resource
     }
 
     /**
-     * The recipe as the assistant read or revised it, for the cook to check: Quick add's and
-     * Update from notes' review steps.
-     *
-     * @return list<Component>
-     */
-    public static function draftFields(): array
-    {
-        return [
-            Grid::make(2)
-                ->schema(self::detailFields()),
-            Section::make('Ingredients')
-                ->compact()
-                ->schema([self::ingredientsRepeater(withAisle: true)]),
-            Section::make('Substitutes')
-                ->description(self::SUBSTITUTES_DESCRIPTION)
-                ->compact()
-                ->schema([self::substitutesRepeater(withAisle: true)]),
-            Section::make('Variants')
-                ->description(self::VARIANTS_DESCRIPTION)
-                ->compact()
-                ->schema([self::variantsRepeater(withAisle: true)]),
-            Section::make('Equipment')
-                ->compact()
-                ->schema([self::equipmentRepeater(withSuggestions: true)]),
-            Section::make('Steps')
-                ->compact()
-                ->schema([self::stepsRepeater()]),
-        ];
-    }
-
-    /**
-     * Put a draft into draftFields(), with the catalog ingredient or the piece of equipment each
-     * new name may mean.
-     *
-     * @param  array<string, string>  $suggestions  Catalog names keyed by the new name in lowercase (SuggestCatalogNames::handle()).
-     * @param  array<string, string>  $equipmentSuggestions  Equipment names keyed the same way (SuggestCatalogNames::equipment()).
-     */
-    public static function fillDraft(Set $set, RecipeDraft $draft, array $suggestions = [], array $equipmentSuggestions = []): void
-    {
-        $suggest = fn (array $lines): array => array_map(fn (array $line): array => [...$line, 'suggestion' => $suggestions[mb_strtolower($line['name'])] ?? null], $lines);
-        $state = $draft->toArray();
-
-        $state['ingredients'] = $suggest($state['ingredients']);
-        $state['substitutes'] = array_map(fn (array $substitute): array => [...$substitute, 'ingredients' => $suggest($substitute['ingredients'])], $state['substitutes']);
-        $state['variants'] = array_map(fn (array $variant): array => [...$variant, 'ingredients' => $suggest($variant['ingredients'])], $state['variants']);
-        $state['equipment'] = array_map(fn (array $piece): array => [...$piece, 'suggestion' => $equipmentSuggestions[mb_strtolower($piece['name'])] ?? null], $state['equipment']);
-
-        foreach ($state as $field => $value) {
-            $set($field, $value);
-        }
-
-        // A simple repeater's items each hold their value under the field's name.
-        $set('steps', array_map(fn (string $step): array => ['step' => $step], $draft->steps));
-    }
-
-    /**
      * Ingredient lines. Names that aren't in the catalog are added to it as one-offs when saved.
-     *
-     * @param  bool  $withAisle  Carry the aisle the assistant suggested for new ingredients.
      */
-    public static function ingredientsRepeater(bool $withAisle = false): Repeater
+    private static function ingredientsRepeater(): Repeater
     {
         return Repeater::make('ingredients')
             ->hiddenLabel()
@@ -283,54 +217,28 @@ class RecipeResource extends Resource
                 TextInput::make('note')
                     ->maxLength(255),
                 Checkbox::make('is_optional'),
-                ...($withAisle ? [Hidden::make('category'), Hidden::make('suggestion')] : []),
             ]);
     }
 
     /**
      * An ingredient line's name: catalog names to pick from, and a note when the catalog hasn't
-     * got it, with the catalog ingredient it may mean to swap in (useSuggestionAction()).
+     * got it.
      */
-    public static function ingredientNameInput(): TextInput
+    private static function ingredientNameInput(): TextInput
     {
         return TextInput::make('name')
             ->required()
             ->maxLength(255)
             ->datalist(fn (): array => Ingredient::query()->orderBy('name')->pluck('name')->all())
-            ->belowContent(fn (Get $get): ?array => filled($get('name')) && Ingredient::query()->named((string) $get('name'))->doesntExist()
-                ? ['New: added to your ingredients', self::useSuggestionAction('name')]
+            ->belowContent(fn (Get $get): ?string => filled($get('name')) && Ingredient::query()->named((string) $get('name'))->doesntExist()
+                ? 'New: added to your ingredients'
                 : null);
     }
 
     /**
-     * Swaps the catalog ingredient (or piece of equipment) the assistant thinks a new name means
-     * (the row's hidden `suggestion`) into the field. Shown only while the field holds a name
-     * that isn't listed.
-     *
-     * @param  class-string<Ingredient|Equipment>  $listedIn
-     */
-    public static function useSuggestionAction(string $field, string $listedIn = Ingredient::class): Action
-    {
-        return Action::make('useSuggestion')
-            ->label(fn (Get $get): string => 'Did you mean '.$get('suggestion').'?')
-            ->link()
-            ->visible(fn (Get $get): bool => filled($get('suggestion'))
-                && filled($get($field))
-                && ! Names::same((string) $get('suggestion'), (string) $get($field))
-                && $listedIn::query()->named((string) $get($field))->doesntExist())
-            ->action(function (Get $get, Set $set) use ($field): void {
-                $set($field, $get('suggestion'));
-                $set('suggestion', null);
-            });
-    }
-
-    /**
      * Substitutes, each for one of the ingredients in the form, with lines of their own.
-     *
-     * @param  bool  $relationship  Save to the recipe's substitutes (the resource form).
-     * @param  bool  $withAisle  Carry the aisle the assistant suggested for new ingredients.
      */
-    public static function substitutesRepeater(bool $relationship = false, bool $withAisle = false): Repeater
+    private static function substitutesRepeater(): Repeater
     {
         $lines = Repeater::make('ingredients')
             ->label('Use')
@@ -346,7 +254,6 @@ class RecipeResource extends Resource
                 TextInput::make('quantity')
                     ->maxLength(100),
                 self::ingredientNameInput(),
-                ...($withAisle ? [Hidden::make('category'), Hidden::make('suggestion')] : []),
             ]);
 
         $substitutes = Repeater::make('substitutes')
@@ -367,21 +274,20 @@ class RecipeResource extends Resource
                 TextInput::make('note')
                     ->maxLength(255)
                     ->placeholder('Let it sit 5 minutes'),
-                ($relationship ? $lines->relationship()->orderColumn('sort') : $lines)
+                $lines
+                    ->relationship()
+                    ->orderColumn('sort')
                     ->columnSpanFull(),
             ])
             ->columns(2);
 
-        return $relationship ? $substitutes->relationship()->orderColumn('sort') : $substitutes;
+        return $substitutes->relationship()->orderColumn('sort');
     }
 
     /**
      * Variants, each with its changes to the ingredients.
-     *
-     * @param  bool  $relationship  Save to the recipe's variants (the resource form).
-     * @param  bool  $withAisle  Carry the aisle the assistant suggested for new ingredients.
      */
-    public static function variantsRepeater(bool $relationship = false, bool $withAisle = false): Repeater
+    private static function variantsRepeater(): Repeater
     {
         $changes = Repeater::make('ingredients')
             ->label('Changes to the ingredients')
@@ -401,7 +307,6 @@ class RecipeResource extends Resource
                 TextInput::make('note')
                     ->maxLength(255),
                 Checkbox::make('is_left_out'),
-                ...($withAisle ? [Hidden::make('category'), Hidden::make('suggestion')] : []),
             ]);
 
         $variants = Repeater::make('variants')
@@ -417,18 +322,17 @@ class RecipeResource extends Resource
                 Textarea::make('notes')
                     ->rows(1)
                     ->placeholder('Keep the seeds in.'),
-                ($relationship ? $changes->relationship()->orderColumn('sort') : $changes)
+                $changes
+                    ->relationship()
+                    ->orderColumn('sort')
                     ->columnSpanFull(),
             ])
             ->columns(2);
 
-        return $relationship ? $variants->relationship()->orderColumn('sort') : $variants;
+        return $variants->relationship()->orderColumn('sort');
     }
 
-    /**
-     * @param  bool  $withSuggestions  Carry the piece the assistant thinks a name it hasn't got means.
-     */
-    public static function equipmentRepeater(bool $withSuggestions = false): Repeater
+    private static function equipmentRepeater(): Repeater
     {
         return Repeater::make('equipment')
             ->hiddenLabel()
@@ -443,14 +347,13 @@ class RecipeResource extends Resource
                     ->required()
                     ->maxLength(255)
                     ->datalist(fn (): array => Equipment::query()->orderBy('name')->pluck('name')->all())
-                    ->belowContent(fn (Get $get): ?array => filled($get('name')) && Equipment::query()->named((string) $get('name'))->doesntExist()
-                        ? ['Not in your equipment', self::useSuggestionAction('name', Equipment::class)]
+                    ->belowContent(fn (Get $get): ?string => filled($get('name')) && Equipment::query()->named((string) $get('name'))->doesntExist()
+                        ? 'Not in your equipment'
                         : null),
-                ...($withSuggestions ? [Hidden::make('suggestion')] : []),
             ]);
     }
 
-    public static function stepsRepeater(): Repeater
+    private static function stepsRepeater(): Repeater
     {
         return Repeater::make('steps')
             ->hiddenLabel()
@@ -583,7 +486,7 @@ class RecipeResource extends Resource
             ->defaultPaginationPageOption(50)
             ->emptyStateIcon(Heroicon::OutlinedBookOpen)
             ->emptyStateHeading('No recipes yet')
-            ->emptyStateDescription('Snap a recipe card or the back of a package with Quick add, or type one in.')
+            ->emptyStateDescription('Type one in, or ask Claude to save one from a web page or a photo of the card.')
             ->columns([
                 ImageColumn::make('photos')
                     ->label('')

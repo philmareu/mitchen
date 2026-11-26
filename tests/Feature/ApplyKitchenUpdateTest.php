@@ -16,9 +16,22 @@ use App\Support\PurchaseDetails;
 use App\Support\UnreadableQuantity;
 use Carbon\CarbonImmutable;
 
+/**
+ * Two pounds of chicken thighs bought for the fridge, unless overridden.
+ *
+ * @param  array<string, mixed>  $overrides
+ */
 function change(array $overrides = []): ProposedChange
 {
-    return ProposedChange::fromArray([...readerChange(), ...$overrides]);
+    return ProposedChange::fromArray([
+        'kind' => 'bought',
+        'ingredient' => 'Chicken thighs',
+        'quantity' => '2 lb',
+        'location' => 'fridge',
+        'category' => 'meat_and_seafood',
+        'from_note' => 'bought 2 lbs chicken thighs',
+        ...$overrides,
+    ]);
 }
 
 it('adds a new ingredient as a one-off with what was bought', function () {

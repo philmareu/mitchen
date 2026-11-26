@@ -110,12 +110,6 @@ it('brings in what is on the restock list', function () {
     expect(ShoppingListItem::sole()->ingredient_id)->toBe($milk->id);
 });
 
-it('has quick update', function () {
-    config(['ai.providers.anthropic.key' => 'test-key']);
-
-    livewire(ManageShoppingListItems::class)->assertActionEnabled('quickUpdate');
-});
-
 it('records where you shopped and what it cost when putting away', function () {
     Ingredient::factory()->create(['name' => 'Milk']);
     ShoppingListItem::factory()->bought()->create(['name' => 'Milk', 'quantity' => '1 gallon']);

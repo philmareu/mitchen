@@ -26,9 +26,8 @@ use Filament\Tables\Table;
 
 /**
  * What to get on the next shop, grouped by aisle. Ticked off in the store, then put away
- * into the inventory; a receipt photo through Quick update does both at once. Ordering online
- * works the same way: find each thing in the store's online shop, add it to the cart there and
- * tick it off here.
+ * into the inventory. Ordering online works the same way: find each thing in the store's
+ * online shop, add it to the cart there and tick it off here.
  */
 class ShoppingListItemResource extends Resource
 {
@@ -87,7 +86,7 @@ class ShoppingListItemResource extends Resource
             ->paginated(false)
             ->emptyStateIcon(Heroicon::OutlinedShoppingCart)
             ->emptyStateHeading('Nothing to buy')
-            ->emptyStateDescription('Add things yourself, bring in what\'s on the restock list, or tell Quick update "need eggs".')
+            ->emptyStateDescription('Add things yourself, or bring in what\'s on the restock list.')
             ->columns([
                 CheckboxColumn::make('bought')
                     ->label('Got it')

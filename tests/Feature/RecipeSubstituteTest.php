@@ -1,8 +1,7 @@
 <?php
 
 use App\Actions\AddRecipe;
-use App\Actions\ReadRecipe;
-use App\Ai\Agents\RecipeReader;
+use App\Actions\PrepareRecipeDraft;
 use App\Enums\IngredientCategory;
 use App\Models\Ingredient;
 use App\Models\InventoryItem;
@@ -78,8 +77,10 @@ it('counts an ingredient that is out as there when a substitute is on hand', fun
     expect($recipe->fresh()->ingredients[0]->isCoveredBySubstitute())->toBeFalse();
 });
 
-it('reads substitutes from a card, for ingredients the recipe has', function () {
-    RecipeReader::fake([readerRecipe([
+it('keeps the substitutes an assistant sends, for ingredients the recipe has', function () {
+    Ingredient::factory()->create(['name' => 'Milk']);
+
+    $draft = app(PrepareRecipeDraft::class)->handle(sentRecipe([
         'ingredients' => [
             ['quantity' => '1 cup', 'name' => 'Buttermilk', 'note' => null, 'optional' => false, 'category' => 'dairy_and_eggs'],
         ],
@@ -88,15 +89,12 @@ it('reads substitutes from a card, for ingredients the recipe has', function () 
             ['instead_of' => 'Sugar', 'use' => [['quantity' => '2 tbsp', 'name' => 'Honey', 'category' => 'baking']], 'note' => null],
             ['instead_of' => 'Buttermilk', 'use' => [], 'note' => null],
         ],
-    ])]);
-    Ingredient::factory()->create(['name' => 'Milk']);
-
-    $draft = app(ReadRecipe::class)->handle('pancakes');
+    ]));
 
     expect($draft->substitutes)->toHaveCount(1)
         ->and($draft->substitutes[0]->insteadOf)->toBe('Buttermilk')
-        ->and(array_map(fn (RecipeLine $line): string => $line->name, $draft->substitutes[0]->ingredients))->toBe(['Milk', 'Lemon juice'])
-        ->and($draft->toArray()['substitutes'][0])->toMatchArray(['instead_of' => 'Buttermilk', 'note' => 'Let it sit.']);
+        ->and($draft->substitutes[0]->note)->toBe('Let it sit.')
+        ->and(array_map(fn (RecipeLine $line): string => $line->name, $draft->substitutes[0]->ingredients))->toBe(['Milk', 'Lemon juice']);
 });
 
 it('says when a substitute was added, changed or removed', function () {

@@ -75,7 +75,7 @@ class CookLogsRelationManager extends RelationManager
                 ->rows(2)
                 ->maxLength(5_000)
                 ->placeholder('More salt, a little less vinegar.')
-                ->helperText('Update from notes works these into a new version of the recipe.'),
+                ->helperText('They wait on the recipe until an edit works them into a new version.'),
         ];
     }
 

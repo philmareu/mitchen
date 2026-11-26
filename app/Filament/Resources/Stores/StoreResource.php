@@ -69,7 +69,7 @@ class StoreResource extends Resource
             ->defaultSort('name')
             ->emptyStateIcon(Heroicon::OutlinedBuildingStorefront)
             ->emptyStateHeading('No stores yet')
-            ->emptyStateDescription('Add the places you shop, or scan a receipt with Quick update and its store is added for you.')
+            ->emptyStateDescription('Add the places you shop. A store you name when putting a shop away is added for you.')
             ->columns([
                 TextColumn::make('name')
                     ->searchable()

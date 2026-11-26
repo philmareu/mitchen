@@ -18,8 +18,7 @@ use Illuminate\Support\Str;
 
 /**
  * Turns changes an assistant worked out with the cook (over the MCP server) into an update to
- * apply, checked against the catalog like ReadKitchenUpdate checks its own reader's: catalog
- * names keep their spelling and aisle, an item id only counts for its own ingredient, a change
+ * apply, checked against the catalog: catalog names keep their spelling and aisle, an item id only counts for its own ingredient, a change
  * that doesn't say where goes where the ingredient already is (new supply replaces the low or
  * out item), else where its aisle usually goes, and anything bought comes off the shopping list.
  */

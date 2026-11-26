@@ -21,8 +21,7 @@ it('lists the purchase history, newest first', function () {
     $this->get('/purchases')->assertOk();
 
     livewire(ManagePurchases::class)
-        ->assertCanSeeTableRecords([$newer, $older], inOrder: true)
-        ->assertActionVisible('quickUpdate');
+        ->assertCanSeeTableRecords([$newer, $older], inOrder: true);
 });
 
 it('filters purchases by store', function () {

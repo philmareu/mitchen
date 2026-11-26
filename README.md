@@ -4,7 +4,7 @@
 
 Mitchen keeps track of your ingredients and how much of each you have, without making you weigh anything. Type `half a jar`, `2 lb`, `a couple cans` or just `low`, and it understands. It knows which ingredients are staples you always keep on hand, so it can tell you what to restock, keep a shopping list, and remind you what to use before it goes off.
 
-Your recipes live alongside it, so each one shows what's on hand, what's missing and what to buy. It's the foundation for a bigger idea: meal planning and an AI assistant that cooks with the ingredients and equipment you actually have.
+Your recipes live alongside it, so each one shows what's on hand, what's missing and what to buy. Mitchen has no AI of its own: connect Claude to it and you have an assistant that cooks with the ingredients and equipment you actually have. Meal planning is next.
 
 ## Features
 
@@ -13,21 +13,17 @@ Your recipes live alongside it, so each one shows what's on hand, what's missing
 - **Restock list, with restock points.** Core ingredients that are low, out, or not stocked at all, with a one-click "Restocked" that records what you bought. Give an ingredient its own restock point (`¼ jar`, `2 cans`, `1 lb`, or `out`) and it goes on the list when what you have adds up to that, converting between units (`12 oz` counts against `1 lb`). Say how much you like to stock up to (`10 lb`, `4 cans`) and the list works out how much to buy: 10 lb less the 2 lb in the pantry is 8 lb, filled in when it goes on the shopping list.
 - **Shopping list.** Grouped by aisle, with what you already have at home under each item. Bring in everything on the restock list in one click, add your own items, tick things off in the store, then put away what you got: check how much and where, and it's added to the inventory and comes off the list.
 - **Order online.** Give a store the address of its online shop (search it for milk and paste the address) and everything on the shopping list gets a link that looks it up there. Find it, add it to the store's cart, tick it off, and put it away when the order arrives. It works with any shop that has a search box, the local grocer's included.
-- **Purchase history and prices.** Every shop is recorded with its store, date, total and what each thing cost: scan the receipt, put away what you ticked off, or add one by hand. See what you spent this month, which store you shop at most, and what you last paid per unit (`$3.49/lb`, `$0.33 each`) right on the shopping list.
+- **Purchase history and prices.** Every shop is recorded with its store, date, total and what each thing cost: put away what you ticked off, have Claude read the receipt, or add one by hand. See what you spent this month, which store you shop at most, and what you last paid per unit (`$3.49/lb`, `$0.33 each`) right on the shopping list.
 - **Use soon.** Anything with a use-by date in the next week.
 - **Organized by place.** Pantry, fridge, freezer, spice rack and counter, with filters for core items and anything running low.
-- **Quick update, powered by Claude.** Type "bought 2 lbs chicken thighs and a jar of peanut butter, out of milk, half a bag of rice left, need eggs" and Mitchen turns it into a list of changes: new supply, what's left, what's used up, what to buy. You check and edit the list before anything is saved.
-- **Snap a grocery receipt.** Add a photo (or a few, for a long receipt) and Mitchen decodes lines like `BNLS SKNLS CHKN THGH 2.13 lb` into "Chicken thighs, 2.13 lb, fridge", matches them to what you already keep, reads the store, date, total and line prices for your purchase history, leaves out bags and tax, and takes what you bought off the shopping list, paper towels included (including anything you already ticked in the store, so nothing is counted twice). Same review step before saving; photos are never stored.
-- **Take stock with a photo.** Photograph a shelf of labeled jars, the fridge or the pantry, and Mitchen reads the labels, counts cans and cartons, and judges how full each jar is ("⅓ jar of flour"). If a photo shows a whole shelf or fridge and something you have on record isn't in it, it asks whether that's gone rather than assuming.
-- **Equipment, from photos.** Photograph your stand mixer, a shelf of pans or a drawer of utensils, or just describe them ("two half sheet pans, a 7 qt Lodge Dutch oven, the blender died"), and Mitchen lists each piece with its brand and size, matched against what you already have. Same review step before saving. Unlike receipts, these photos are kept with each piece as a picture of your own gear; crop a drawer shot down to one utensil in the editor.
-- **Recipes, from a photo of the card.** Snap a handwritten recipe card, a cookbook page or the back of a package, or paste a recipe, and Mitchen reads its ingredients, equipment and steps, matching "flour" to the *All-purpose flour* you keep and adding anything new to your ingredients. Same review step before saving, and the photo is kept with the recipe. Or type one in.
+- **Equipment.** Everything you cook with, from the stand mixer down to a ladle, with its brand, size and photos of your own pieces. A recipe that calls for a piece counts it as there once it's listed.
+- **Recipes.** Type one in with its ingredients, equipment and steps, and keep a photo of the original card with it. Each ingredient links to the one you keep by name, and anything new is added to your ingredients.
 - **What's in the kitchen for each recipe.** Every ingredient shows *on hand*, *running low* or *out*, and where it is (`2 lb · Fridge`); every piece of equipment, whether you have it. Put what's missing on the shopping list in one click, with the amounts the recipe calls for. Water and ice count as always on hand.
 - **What to cook.** Recipes sorted by how close you are to making them: *ready to cook*, *a quick shop* (up to three things), *a bigger shop*, *plan ahead* or *needs equipment*, with what's missing. Mark an ingredient as hard to find, seasonal (with its months) or homemade with how long a batch takes, and recipes that need it are planned for rather than ruled out: "Plan ahead: Pickled red onions (make ahead, about 3 days)". If a variant gets you closer (no cilantro), it says so. Avocados bought hard can be marked as ripening until a date, so guacamole waits for them instead of sending you to the store. Filter by cuisine, course, main protein, diet or your own tags: something Italian, a side, a vegetarian main. The dashboard suggests what's ready or close, made longest ago first, and puts what to buy on the shopping list in one click.
 - **Scale a recipe.** Halve or double it, and the amounts Mitchen can read are scaled (`1½ cups` becomes `¾ cup`); `a pinch` stays a pinch.
-- **Recipes that get better.** Press *Made it* to log a batch: how it turned out and what to change next time, even days later (pickles taste right on day three). *Update from notes* has Claude work your notes into the recipe ("more salt, less vinegar" becomes `1½ tsp` salt and `¾ cup` vinegar); you check it and it's saved as a new version. Every change keeps the old version, with what changed.
-- **Substitutes and variants.** A substitute stands in for one ingredient when you're out (no buttermilk: milk and lemon juice), so the recipe still counts as ready to cook. A variant is a way of making it you pick up front (mild or hot salsa, blueberry pancakes), and the ingredients and shopping list follow it. Quick add reads both off the card.
-- **AI usage and cost.** Every call to Claude is logged with its model, tokens, time and estimated cost, with this month's and all-time spend at a glance.
-- **Ask Claude about your kitchen.** Mitchen is an MCP server, so you can connect it to the Claude app and ask from the counter: what can I make tonight, what's on the shopping list, what should I use up? Tell it what you bought or finished and it reads the changes back, saving them once you agree. Hand it a recipe from a website and it saves it to your collection; tell it how dinner turned out and it goes in the cook log, then have it work those notes into the next version of the recipe.
+- **Recipes that get better.** Press *Made it* to log a batch: how it turned out and what to change next time, even days later (pickles taste right on day three). The notes wait on the recipe until you work them in, by hand or by asking Claude ("more salt, less vinegar" becomes `1½ tsp` salt and `¾ cup` vinegar, shown to you before it's saved). Every change keeps the old version, with what changed.
+- **Substitutes and variants.** A substitute stands in for one ingredient when you're out (no buttermilk: milk and lemon juice), so the recipe still counts as ready to cook. A variant is a way of making it you pick up front (mild or hot salsa, blueberry pancakes), and the ingredients and shopping list follow it.
+- **Claude is the assistant.** Mitchen is an MCP server, so you can connect it to the Claude app and talk to your kitchen from the counter: what can I make tonight, what's on the shopping list, what should I use up? Tell it what you bought or finished, or send it a photo of the receipt or the fridge, and it reads the changes back, saving them once you agree. Hand it a recipe from a website or a photo of a card and it saves it to your collection; tell it how dinner turned out and it goes in the cook log, then have it work those notes into the next version of the recipe.
 
 ## Getting started
 
@@ -47,11 +43,11 @@ For a real install, skip `--seed` and create your own login with `php artisan ma
 
 Photos (recipe cards and equipment) are kept privately in `storage/app/private`. To keep them on S3 instead, set `FILESYSTEM_DISK=s3` and the `AWS_*` values, and give the bucket a CORS rule allowing `GET` from your app's URL so the photo fields and editor can load them.
 
-Quick update and photo reading use the [Laravel AI SDK](https://github.com/laravel/ai) with Anthropic. Set `ANTHROPIC_API_KEY` in `.env` to turn them on; everything else works without it. Typed notes run on the fast model (`ANTHROPIC_FAST_MODEL`, Claude Haiku by default) and photos on your main model (`ANTHROPIC_MODEL`). Cost estimates use the rates in `config/ai.php`; on Claude Sonnet a receipt costs about a cent and a shelf photo about three.
+Mitchen makes no AI calls itself, so there's no API key to set. To talk to your kitchen, connect Claude.
 
 ## Connecting Claude
 
-Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list, how much of a staple to keep, new recipes, the cook log, revisions from your notes, previewed before they're saved, and equipment you forgot to list, so recipes that need it count it as there), using the same actions as the app. Claude does the understanding on its side, so these calls don't use your `ANTHROPIC_API_KEY`.
+Mitchen serves an MCP server at `/mcp`. Its tools read the kitchen (what's on hand, the restock and use-soon lists, the shopping list, recipes by how close you are to making them, equipment) and update it (bought, used up, how much is left, the shopping list, how much of a staple to keep, new recipes, the cook log, revisions from your notes, previewed before they're saved, and equipment you forgot to list, so recipes that need it count it as there), using the same actions as the app. Claude does the understanding on its side: Mitchen has no API key and makes no AI calls of its own.
 
 The shopping list comes with a link into each store's online shop for everything on it, so a Claude that can use your browser can fill the cart there and read it back to you. Checking out stays with you.
 
@@ -74,31 +70,27 @@ Each inventory item stores its quantity as **either** an amount with an optional
 | `almost out` | low | Low |
 | `0` or `empty` | out | Out |
 
-Units cover weights, volumes and the containers food comes in (jar, can, bottle, bag, box, bunch, head, clove, stick…). Anything unrecognized is rejected with a hint instead of being saved as junk, so recipes and the AI layer can rely on the data later. The parser is `app/Support/QuantityParser.php`, and its tests in `tests/Unit` double as a list of what it understands.
+Units cover weights, volumes and the containers food comes in (jar, can, bottle, bag, box, bunch, head, clove, stick…). Anything unrecognized is rejected with a hint instead of being saved as junk, so recipes and an assistant can rely on the data. The parser is `app/Support/QuantityParser.php`, and its tests in `tests/Unit` double as a list of what it understands.
 
 ## Roadmap
 
 - [x] Ingredient catalog with core / one-off ingredients
 - [x] Inventory with flexible quantities, locations and use-by dates
 - [x] Restock and use-soon lists
-- [x] Recipes linked to ingredients and equipment, added from a photo of the card or a note, showing what's on hand
+- [x] Recipes linked to ingredients and equipment, showing what's on hand
 - [x] Recipe history (a cook log and versions), substitutes and variants
 - [x] Recipe suggestions: what you can make now, with a little shopping, or with time to prep ahead
 - [x] Recipes sorted by cuisine, course, main protein, diet and your own tags
-- [x] Equipment, added from photos or a note
+- [x] Equipment, with photos of your own pieces
 - [x] Restock points and a shopping list built from the restock list
 - [x] Stock targets: how much of a staple to keep, so the restock list says how much to buy
 - [ ] Meal planning, adding to the shopping list from the plan
-- [x] Quick updates in plain language ("bought 2 lbs chicken, out of milk, need eggs"), reviewed before saving
-- [x] Grocery receipt photos that tick off the shopping list
-- [x] Stock-takes from photos of shelves, the fridge or the pantry
 - [x] Stores and purchase history with prices
 - [x] Links from the shopping list into a store's online shop, to order for delivery or pickup
 - [ ] Filling a store's cart from the shopping list, and a nudge to order before the kitchen runs out
 - [ ] Price comparison across stores, and choosing a store per shopping list item
-- [x] AI usage and cost tracking
-- [x] An MCP server, so Claude can read and update the kitchen
-- [ ] More AI: recipes from the web, and meal ideas from what's on hand
+- [x] An MCP server, so Claude can read and update the kitchen: changes in plain language ("bought 2 lbs chicken, out of milk, need eggs") or from a receipt, read back before saving, and recipes from the web
+- [ ] More for Claude to do: meal ideas from what's on hand
 
 ## Development
 
@@ -109,4 +101,4 @@ vendor/bin/pint                 # code style
 vendor/bin/phpstan analyse      # Larastan, level 6
 ```
 
-Built with Laravel 13, Filament 5, Livewire 4 and Pest.
+Built with Laravel 13, Filament 5, Livewire 4, Laravel MCP and Pest.

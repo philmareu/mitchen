@@ -30,8 +30,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
- * Purchase history: every shop recorded by Quick update (receipts and notes), Put away on
- * the shopping list, or by hand, with what it cost.
+ * Purchase history: every shop recorded by Put away on the shopping list, by an assistant
+ * over the MCP server, or by hand, with what it cost.
  */
 class PurchaseResource extends Resource
 {
@@ -112,7 +112,7 @@ class PurchaseResource extends Resource
             ->paginated([25, 50, 100])
             ->emptyStateIcon(Heroicon::OutlinedReceiptPercent)
             ->emptyStateHeading('No purchases yet')
-            ->emptyStateDescription('Scan a receipt with Quick update, put away what you got from the shopping list, or add one by hand.')
+            ->emptyStateDescription('Put away what you got from the shopping list, or add one by hand.')
             ->columns([
                 TextColumn::make('purchased_on')
                     ->label('Date')

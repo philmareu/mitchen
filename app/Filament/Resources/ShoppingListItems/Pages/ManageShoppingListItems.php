@@ -5,7 +5,6 @@ namespace App\Filament\Resources\ShoppingListItems\Pages;
 use App\Actions\AddToShoppingList;
 use App\Enums\IngredientCategory;
 use App\Filament\Actions\PutAwayAction;
-use App\Filament\Actions\QuickUpdateAction;
 use App\Filament\Resources\ShoppingListItems\ShoppingListItemResource;
 use App\Models\Ingredient;
 use App\Models\ShoppingListItem;
@@ -24,7 +23,6 @@ class ManageShoppingListItems extends ManageRecords
     protected function getHeaderActions(): array
     {
         return [
-            QuickUpdateAction::make(),
             Action::make('addRestockList')
                 ->label(fn (): string => 'Add '.$this->restockCount().' from the restock list')
                 ->icon(Heroicon::OutlinedPlusCircle)

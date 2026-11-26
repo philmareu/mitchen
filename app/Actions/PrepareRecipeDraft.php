@@ -2,101 +2,77 @@
 
 namespace App\Actions;
 
-use App\Ai\Agents\RecipeReader;
 use App\Enums\Course;
 use App\Enums\Diet;
 use App\Enums\IngredientCategory;
 use App\Enums\Protein;
 use App\Models\Equipment;
 use App\Models\Ingredient;
-use App\Models\Recipe;
 use App\Support\Names;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
 use App\Support\SubstituteDraft;
 use App\Support\VariantDraft;
-use ArrayAccess;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
-use Laravel\Ai\Files\Image;
-use Laravel\Ai\Files\LocalImage;
 
 /**
- * Asks the assistant for the recipe in the photos or note, then tidies its answer: names
- * that match the catalog or the kitchen's equipment (ignoring case, singular or plural) take their spelling,
- * servings that aren't a positive number are dropped, empty lines are skipped, and substitutes
- * for an ingredient the recipe doesn't have are dropped.
+ * Turns a recipe an assistant sent (over the MCP server) into a draft to save, checked against
+ * the kitchen: names that match the catalog or the kitchen's equipment (ignoring case, singular
+ * or plural) take their spelling, servings that aren't a positive number are dropped, empty
+ * lines are skipped, and substitutes for an ingredient the recipe doesn't have are dropped.
  */
-class ReadRecipe
+class PrepareRecipeDraft
 {
     /**
-     * @param  list<string>  $photos  Paths to photos of the recipe.
+     * @param  array<string, mixed>  $recipe  As add-recipe and update-recipe take it (TakesRecipes).
      */
-    public function handle(string $note, array $photos = []): RecipeDraft
+    public function handle(array $recipe): RecipeDraft
     {
         $ingredients = Ingredient::query()->orderBy('name')->pluck('name');
         $equipment = Equipment::query()->orderBy('name')->pluck('name');
 
-        $response = RecipeReader::make()->prompt(
-            $this->prompt($note, count($photos), $ingredients, $equipment),
-            attachments: array_map(fn (string $path): LocalImage => Image::fromPath($path), $photos),
-        );
-
-        return $this->tidy($response, $ingredients, $equipment);
-    }
-
-    /**
-     * Turn the assistant's answer into a draft. Also used for revisions (ReviseRecipe).
-     *
-     * @param  array<string, mixed>|ArrayAccess<string, mixed>  $response
-     * @param  Collection<int, string>  $ingredients  The catalog's names.
-     * @param  Collection<int, string>  $equipment  The kitchen's equipment names.
-     */
-    public function tidy(array|ArrayAccess $response, Collection $ingredients, Collection $equipment): RecipeDraft
-    {
-        $lines = collect($this->list($response['ingredients'] ?? null))
+        $lines = collect($this->list($recipe['ingredients'] ?? null))
             ->map(fn (mixed $line): ?RecipeLine => is_array($line) ? $this->line($line, $ingredients) : null)
             ->filter()
             ->values()
             ->all();
 
-        $steps = $this->texts($response['steps'] ?? null);
-        $servings = $response['servings'] ?? null;
+        $steps = $this->texts($recipe['steps'] ?? null);
+        $servings = $recipe['servings'] ?? null;
 
         return new RecipeDraft(
-            name: $this->text($response['name'] ?? null) ?? ($lines === [] && $steps === [] ? '' : 'Untitled recipe'),
-            source: $this->text($response['source'] ?? null),
+            name: $this->text($recipe['name'] ?? null) ?? ($lines === [] && $steps === [] ? '' : 'Untitled recipe'),
+            source: $this->text($recipe['source'] ?? null),
             servings: is_numeric($servings) && $servings >= 1 ? min((int) $servings, 999) : null,
             ingredients: $lines,
-            substitutes: collect($this->list($response['substitutes'] ?? null))
+            substitutes: collect($this->list($recipe['substitutes'] ?? null))
                 ->map(fn (mixed $substitute): ?SubstituteDraft => is_array($substitute) ? $this->substitute($substitute, $lines, $ingredients) : null)
                 ->filter()
                 ->values()
                 ->all(),
-            variants: collect($this->list($response['variants'] ?? null))
+            variants: collect($this->list($recipe['variants'] ?? null))
                 ->map(fn (mixed $variant): ?VariantDraft => is_array($variant) ? $this->variant($variant, $lines, $ingredients) : null)
                 ->filter()
                 ->values()
                 ->all(),
-            equipment: collect($this->texts($response['equipment'] ?? null))
+            equipment: collect($this->texts($recipe['equipment'] ?? null))
                 ->map(fn (string $name): string => $this->spelledAs($name, $equipment))
                 ->unique(fn (string $name): string => mb_strtolower($name))
                 ->values()
                 ->all(),
             steps: $steps,
-            notes: $this->text($response['notes'] ?? null),
-            notUnderstood: $this->texts($response['not_understood'] ?? null),
-            changeNote: $this->text($response['summary'] ?? null),
-            cuisine: ($cuisine = $this->text($response['cuisine'] ?? null)) === null ? null : Str::limit($cuisine, 100, ''),
-            course: Course::tryFrom((string) $this->text($response['course'] ?? null)),
-            protein: Protein::tryFrom((string) $this->text($response['protein'] ?? null)),
-            diets: collect($this->texts($response['diets'] ?? null))
+            notes: $this->text($recipe['notes'] ?? null),
+            cuisine: ($cuisine = $this->text($recipe['cuisine'] ?? null)) === null ? null : Str::limit($cuisine, 100, ''),
+            course: Course::tryFrom((string) $this->text($recipe['course'] ?? null)),
+            protein: Protein::tryFrom((string) $this->text($recipe['protein'] ?? null)),
+            diets: collect($this->texts($recipe['diets'] ?? null))
                 ->map(fn (string $diet): ?Diet => Diet::tryFrom($diet))
                 ->filter()
                 ->unique()
                 ->values()
                 ->all(),
-            tags: collect($this->texts($response['tags'] ?? null))
+            tags: collect($this->texts($recipe['tags'] ?? null))
                 ->map(fn (string $tag): string => Str::limit($tag, 50, ''))
                 ->unique(fn (string $tag): string => mb_strtolower($tag))
                 ->take(10)
@@ -206,43 +182,12 @@ class ReadRecipe
     }
 
     /**
-     * The model's output is untrusted: anything that isn't a list counts as empty.
+     * What an assistant sends is untrusted: anything that isn't a list counts as empty.
      *
      * @return list<mixed>
      */
     private function list(mixed $value): array
     {
         return is_array($value) ? array_values($value) : [];
-    }
-
-    /**
-     * @param  Collection<int, string>  $ingredients
-     * @param  Collection<int, string>  $equipment
-     */
-    private function prompt(string $note, int $photoCount, Collection $ingredients, Collection $equipment): string
-    {
-        $note = trim($note) === '' ? '(no note, just the photos)' : $note;
-        $photos = $photoCount === 0 ? 'none' : (string) $photoCount;
-        $catalog = $ingredients->join(', ') ?: '(empty)';
-        $kitchen = $equipment->join(', ') ?: '(none listed)';
-        $cuisines = Recipe::query()->cuisines()->join(', ') ?: '(none yet)';
-        $tags = Recipe::query()->tagsInUse()->join(', ') ?: '(none yet)';
-
-        return <<<TEXT
-        The cook's note:
-        """
-        {$note}
-        """
-
-        Photos attached: {$photos}
-
-        Ingredients in the catalog: {$catalog}
-
-        Equipment the kitchen has: {$kitchen}
-
-        Cuisines the cook's recipes use: {$cuisines}
-
-        Tags the cook's recipes use: {$tags}
-        TEXT;
     }
 }

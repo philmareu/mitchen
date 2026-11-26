@@ -1,7 +1,5 @@
 <?php
 
-use App\Ai\Agents\RecipeReviser;
-use App\Filament\Actions\UpdateRecipeFromNotesAction;
 use App\Filament\Resources\Recipes\Pages\EditRecipe;
 use App\Filament\Resources\Recipes\Pages\ListRecipes;
 use App\Filament\Resources\Recipes\Pages\ViewRecipe;
@@ -9,15 +7,12 @@ use App\Filament\Resources\Recipes\RelationManagers\CookLogsRelationManager;
 use App\Filament\Resources\Recipes\RelationManagers\VersionsRelationManager;
 use App\Models\CookLog;
 use App\Models\Recipe;
+use Filament\Actions\EditAction;
 use Filament\Actions\Testing\TestAction;
-use Laravel\Ai\Prompts\AgentPrompt;
 
 use function Pest\Livewire\livewire;
 
-beforeEach(function () {
-    actingAsCook();
-    config(['ai.providers.anthropic.key' => 'test-key']);
-});
+beforeEach(fn () => actingAsCook());
 
 /**
  * Pickled red onions with salt as the third line.
@@ -40,7 +35,7 @@ it('logs a cook from the recipe page', function () {
         ->assertHasNoFormErrors()
         ->assertNotified('Added to the cook log')
         ->assertDispatched('cook-log-updated')
-        ->assertActionExists('updateFromNotes', fn (UpdateRecipeFromNotesAction $action): bool => (string) $action->getBadge() === '1');
+        ->assertActionExists('edit', fn (EditAction $action): bool => (string) $action->getBadge() === '1');
 
     expect($recipe->cookLogs()->sole())
         ->cooked_on->toDateString()->toBe('2026-10-28')
@@ -106,53 +101,6 @@ it('fixes a mistake without making a new version', function () {
 
     expect($recipe->fresh())->version->toBe(1)->steps->toBe(['Slice thin.', 'Pickle 3 days.'])
         ->and($recipe->versions()->count())->toBe(0);
-});
-
-it('updates the recipe from the notes for next time, for the cook to check', function () {
-    $recipe = onionsRecipe();
-    $log = CookLog::factory()->for($recipe)->nextTime('More salt.')->create();
-
-    RecipeReviser::fake([readerRecipe([
-        'name' => 'Pickled red onions',
-        'source' => null,
-        'servings' => 1,
-        'ingredients' => [
-            ['quantity' => '1 large', 'name' => 'Red onion', 'note' => null, 'optional' => false, 'category' => 'produce'],
-            ['quantity' => '1 cup', 'name' => 'Apple cider vinegar', 'note' => null, 'optional' => false, 'category' => 'other'],
-            ['quantity' => '1½ tsp', 'name' => 'Kosher salt', 'note' => null, 'optional' => false, 'category' => 'spices_and_herbs'],
-        ],
-        'equipment' => [],
-        'steps' => ['Slice.', 'Pickle 3 days.'],
-        'summary' => 'More salt.',
-    ])]);
-
-    livewire(ViewRecipe::class, ['record' => $recipe->getRouteKey()])
-        ->mountAction('updateFromNotes')
-        ->assertSchemaStateSet(['cook_logs' => [(string) $log->id]])
-        ->goToNextWizardStep()
-        ->assertHasNoFormErrors()
-        ->assertWizardCurrentStep(2)
-        ->assertSchemaStateSet(['version_note' => 'More salt.'])
-        ->callMountedAction()
-        ->assertHasNoFormErrors()
-        ->assertNotified('Saved as version 2')
-        ->assertRedirect();
-
-    RecipeReviser::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains('Next time: More salt.'));
-
-    expect($recipe->fresh()->version)->toBe(2)
-        ->and($recipe->fresh()->ingredients[2]->quantity)->toBe('1½ tsp')
-        ->and($log->fresh()->used_in_version)->toBe(2);
-});
-
-it('needs a note or something to change', function () {
-    livewire(ViewRecipe::class, ['record' => onionsRecipe()->getRouteKey()])
-        ->mountAction('updateFromNotes')
-        ->goToNextWizardStep()
-        ->assertHasFormErrors(['instructions' => 'required_without'])
-        ->assertWizardCurrentStep(1);
-
-    RecipeReviser::assertNeverPrompted();
 });
 
 it('shows when each recipe was last made', function () {

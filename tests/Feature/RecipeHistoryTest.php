@@ -1,9 +1,7 @@
 <?php
 
 use App\Actions\RecordRecipeVersion;
-use App\Actions\ReviseRecipe;
 use App\Actions\UpdateRecipe;
-use App\Ai\Agents\RecipeReviser;
 use App\Enums\IngredientCategory;
 use App\Models\CookLog;
 use App\Models\Ingredient;
@@ -11,7 +9,6 @@ use App\Models\Recipe;
 use App\Support\RecipeChanges;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
-use Laravel\Ai\Prompts\AgentPrompt;
 
 /**
  * Pickled red onions, version 1.
@@ -136,35 +133,6 @@ it('logs a cook against the current version, and waits for notes that have somet
     expect($log->version)->toBe(3)
         ->and($log->summary())->toBe('Oct 1 · version 3: Less vinegar.')
         ->and($recipe->waitingNotes()->modelKeys())->toBe([$log->id]);
-});
-
-it('asks the assistant to work the notes into the recipe', function () {
-    $recipe = pickledOnions();
-    $log = CookLog::factory()->for($recipe)->create(['cooked_on' => '2026-10-01', 'thoughts' => 'Too sharp.', 'next_time' => 'More salt, less vinegar.']);
-
-    RecipeReviser::fake([readerRecipe([
-        'name' => 'Pickled red onions',
-        'source' => null,
-        'servings' => 1,
-        'ingredients' => [
-            ['quantity' => '1 large', 'name' => 'red onion', 'note' => 'thinly sliced', 'optional' => false, 'category' => 'produce'],
-            ['quantity' => '¾ cup', 'name' => 'Apple cider vinegar', 'note' => null, 'optional' => false, 'category' => 'oils_and_condiments'],
-            ['quantity' => '1½ tsp', 'name' => 'Kosher salt', 'note' => null, 'optional' => false, 'category' => 'spices_and_herbs'],
-        ],
-        'equipment' => ['Mason jar'],
-        'summary' => 'More salt and a little less vinegar: it was too sharp.',
-    ])]);
-
-    $draft = app(ReviseRecipe::class)->handle($recipe, [$log->id], 'Make it for two jars.');
-
-    RecipeReviser::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains('"quantity": "1 tsp"')
-        && $prompt->contains('Made Oct 1, 2026 (version 1). How it turned out: Too sharp. Next time: More salt, less vinegar.')
-        && $prompt->contains('Make it for two jars.'));
-
-    expect($draft)
-        ->changeNote->toBe('More salt and a little less vinegar: it was too sharp.')
-        ->and($draft->ingredients[0]->name)->toBe('Red onion')
-        ->and($draft->toArray()['version_note'])->toBe('More salt and a little less vinegar: it was too sharp.');
 });
 
 it('saves a revised recipe as the next version', function () {

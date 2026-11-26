@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Recipes\Pages;
 
 use App\Enums\Readiness;
-use App\Filament\Actions\QuickAddRecipeAction;
 use App\Filament\Resources\Recipes\RecipeResource;
 use App\Models\Recipe;
 use Filament\Actions\CreateAction;
@@ -18,7 +17,6 @@ class ListRecipes extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            QuickAddRecipeAction::make(),
             CreateAction::make()
                 ->label('Add recipe'),
         ];
