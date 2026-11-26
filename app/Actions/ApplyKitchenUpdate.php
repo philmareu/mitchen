@@ -15,7 +15,8 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
 /**
- * Saves the changes the cook confirmed from a quick update, all or nothing.
+ * Saves changes to the kitchen the cook agreed to, all or nothing: an assistant's over the MCP
+ * server (update-kitchen), or a shop being put away.
  */
 class ApplyKitchenUpdate
 {

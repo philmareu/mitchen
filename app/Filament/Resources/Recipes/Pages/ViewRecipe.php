@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Recipes\Pages;
 
 use App\Actions\AddToShoppingList;
 use App\Enums\Availability;
-use App\Filament\Actions\UpdateRecipeFromNotesAction;
 use App\Filament\Resources\Recipes\RecipeResource;
 use App\Filament\Resources\Recipes\RelationManagers\CookLogsRelationManager;
 use App\Models\Recipe;
@@ -103,15 +102,16 @@ class ViewRecipe extends ViewRecord
             $this->scaleAction(),
             $this->addToShoppingListAction(),
             $this->madeItAction(),
-            UpdateRecipeFromNotesAction::make(),
-            EditAction::make(),
+            EditAction::make()
+                ->badge(fn (): ?int => $this->record->waitingNotes()->count() ?: null)
+                ->tooltip(fn (): ?string => $this->record->waitingNotes()->isEmpty() ? null : 'Notes for next time are waiting to be worked in'),
             DeleteAction::make()
                 ->modalDescription('Its photos are deleted too. The ingredients stay in your catalog.'),
         ];
     }
 
     /**
-     * The cook log changed in its table: the Update from notes badge counts its notes.
+     * The cook log changed in its table: the Edit badge counts its notes for next time.
      */
     #[On('cook-log-updated')]
     public function refreshCookLog(): void {}

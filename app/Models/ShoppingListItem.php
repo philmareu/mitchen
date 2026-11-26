@@ -17,7 +17,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * for anything else ("Paper towels").
  *
  * Ticking it off (bought_at) puts it in the cart. It leaves the list once it's in the inventory:
- * put away from the list, restocked from the dashboard, or bought in a quick update.
+ * put away from the list, restocked from the dashboard, or bought in an update over the MCP server.
  */
 #[Fillable(['name', 'quantity', 'category', 'bought_at'])]
 #[UseEloquentBuilder(ShoppingListItemBuilder::class)]

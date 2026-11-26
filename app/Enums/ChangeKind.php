@@ -5,7 +5,7 @@ namespace App\Enums;
 use Filament\Support\Contracts\HasLabel;
 
 /**
- * What a quick update says happened to an ingredient, or that it's needed.
+ * What a change to the kitchen says happened to an ingredient, or that it's needed.
  */
 enum ChangeKind: string implements HasLabel
 {

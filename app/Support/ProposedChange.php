@@ -5,12 +5,12 @@ namespace App\Support;
 use App\Enums\ChangeKind;
 use App\Enums\IngredientCategory;
 use App\Enums\StorageLocation;
-use App\Models\InventoryItem;
 use BackedEnum;
 use Carbon\CarbonImmutable;
 
 /**
- * One inventory change read from a quick update, waiting for the cook to confirm it.
+ * One change to what's on hand or the shopping list: from an assistant over the MCP server, or
+ * something bought that Put away is about to put in the inventory.
  */
 final readonly class ProposedChange
 {
@@ -28,22 +28,7 @@ final readonly class ProposedChange
     ) {}
 
     /**
-     * The cook confirmed an item is gone, such as one a stock-take photo didn't show.
-     */
-    public static function useUp(InventoryItem $item): self
-    {
-        return new self(
-            kind: ChangeKind::UsedUp,
-            ingredient: $item->ingredient->name,
-            location: $item->location,
-            inventoryItemId: $item->id,
-            category: $item->ingredient->category ?? IngredientCategory::Other,
-        );
-    }
-
-    /**
-     * Rebuild a change from review form state. Disabled fields (the quantity of something used
-     * up, the location of something needed, the price of anything not bought) aren't in it.
+     * Rebuild a change from Put away's form state.
      *
      * @param  array<string, mixed>  $state
      */

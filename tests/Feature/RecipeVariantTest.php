@@ -2,10 +2,7 @@
 
 use App\Actions\AddRecipe;
 use App\Actions\AddToShoppingList;
-use App\Actions\ReadRecipe;
-use App\Actions\ReviseRecipe;
-use App\Ai\Agents\RecipeReader;
-use App\Ai\Agents\RecipeReviser;
+use App\Actions\PrepareRecipeDraft;
 use App\Enums\IngredientCategory;
 use App\Models\Ingredient;
 use App\Models\InventoryItem;
@@ -16,7 +13,6 @@ use App\Support\RecipeChanges;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
 use App\Support\VariantDraft;
-use Laravel\Ai\Prompts\AgentPrompt;
 
 /**
  * Salsa as written, Hot (more jalapeño and a habanero) and No cilantro.
@@ -75,49 +71,24 @@ it('says what is missing and what to buy for the variant being made', function (
         ->and(ShoppingListItem::sole()->quantity)->toBe('2');
 });
 
-it('reads variants from a card', function () {
-    RecipeReader::fake([readerRecipe([
+it('keeps the variants an assistant sends, with each change\'s note, optional flag and leave-out', function () {
+    $draft = app(PrepareRecipeDraft::class)->handle(sentRecipe([
         'ingredients' => [['quantity' => '1', 'name' => 'Jalapeño', 'note' => null, 'optional' => false, 'category' => 'produce']],
         'variants' => [
             ['name' => 'hot', 'notes' => 'Keep the seeds.', 'changes' => [
                 ['quantity' => '3', 'name' => 'jalapeño', 'note' => 'seeds in', 'optional' => false, 'leave_out' => false, 'category' => 'produce'],
                 ['quantity' => null, 'name' => 'Cilantro', 'note' => null, 'optional' => false, 'leave_out' => true, 'category' => 'produce'],
+                ['quantity' => '1', 'name' => 'Habanero', 'note' => 'seeded', 'optional' => true, 'leave_out' => false, 'category' => 'produce'],
             ]],
             ['name' => '', 'notes' => null, 'changes' => []],
         ],
-    ])]);
-
-    $draft = app(ReadRecipe::class)->handle('salsa');
+    ]));
 
     expect($draft->variants)->toHaveCount(1)
-        ->and($draft->variants[0]->name)->toBe('Hot')
+        ->and($draft->variants[0])->name->toBe('Hot')->notes->toBe('Keep the seeds.')
         ->and($draft->variants[0]->ingredients[0])->name->toBe('Jalapeño')->note->toBe('seeds in')
         ->and($draft->variants[0]->ingredients[1]->isLeftOut)->toBeTrue()
-        ->and($draft->toArray()['variants'][0]['ingredients'][1])->toMatchArray(['name' => 'Cilantro', 'is_left_out' => true]);
-});
-
-it('keeps a variant line\'s note and optional flag through a revision', function () {
-    $recipe = salsa();
-    $recipe->variants->first()->ingredients->firstWhere('name', 'Habanero')->update(['note' => 'seeded', 'is_optional' => true]);
-
-    RecipeReviser::fake([readerRecipe([
-        'name' => 'Salsa',
-        'ingredients' => [['quantity' => '1', 'name' => 'Jalapeño', 'note' => 'seeded', 'optional' => false, 'category' => 'produce']],
-        'variants' => [
-            ['name' => 'Hot', 'notes' => null, 'changes' => [
-                ['quantity' => '1', 'name' => 'Habanero', 'note' => 'seeded', 'optional' => true, 'leave_out' => false, 'category' => 'produce'],
-            ]],
-        ],
-        'summary' => 'No changes.',
-    ])]);
-
-    $draft = app(ReviseRecipe::class)->handle($recipe->fresh(), []);
-
-    RecipeReviser::assertPrompted(fn (AgentPrompt $prompt): bool => preg_match('/"name": "Habanero",\s+"note": "seeded",\s+"optional": true,/', $prompt->prompt) === 1);
-
-    expect($draft->variants[0]->ingredients[0])
-        ->note->toBe('seeded')
-        ->isOptional->toBeTrue();
+        ->and($draft->variants[0]->ingredients[2])->note->toBe('seeded')->isOptional->toBeTrue();
 });
 
 it('says when a variant was added, changed or removed', function () {

@@ -3,7 +3,7 @@
 namespace App\Mcp\Tools;
 
 use App\Actions\AddRecipe as SaveRecipe;
-use App\Actions\ReadRecipe;
+use App\Actions\PrepareRecipeDraft;
 use App\Filament\Resources\Recipes\RecipeResource;
 use App\Mcp\Tools\Concerns\TakesRecipes;
 use App\Models\Ingredient;
@@ -31,7 +31,7 @@ class AddRecipe extends Tool
     /**
      * Handle the tool request.
      */
-    public function handle(Request $request, ReadRecipe $read, SaveRecipe $save): Response|ResponseFactory
+    public function handle(Request $request, PrepareRecipeDraft $prepare, SaveRecipe $save): Response|ResponseFactory
     {
         $validated = $request->validate($this->recipeRules());
 
@@ -39,7 +39,7 @@ class AddRecipe extends Tool
             return Response::error("There's already a recipe called {$existing->name} (id {$existing->id}). Give this one another name, or use get-recipe to see that one.");
         }
 
-        $draft = $this->draft($validated, $read);
+        $draft = $this->draft($validated, $prepare);
 
         if (is_string($draft)) {
             return Response::error($draft);

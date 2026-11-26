@@ -1,6 +1,5 @@
 <?php
 
-use App\Ai\Agents\NameMatcher;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -8,8 +7,6 @@ use Tests\TestCase;
 
 pest()->extend(TestCase::class)
     ->use(RefreshDatabase::class)
-    // The name matcher finds nothing unless a test fakes it with matches.
-    ->beforeEach(fn () => NameMatcher::fake(fn (): array => ['matches' => []]))
     ->in('Feature');
 
 function actingAsCook(): User
@@ -22,56 +19,12 @@ function actingAsCook(): User
 }
 
 /**
- * One change as KitchenUpdateReader returns it.
+ * A recipe as an assistant sends it to add-recipe or update-recipe.
  *
  * @param  array<string, mixed>  $overrides
  * @return array<string, mixed>
  */
-function readerChange(array $overrides = []): array
-{
-    return [
-        'kind' => 'bought',
-        'ingredient' => 'Chicken thighs',
-        'inventory_item_id' => null,
-        'quantity' => '2 lb',
-        'location' => 'fridge',
-        'category' => 'meat_and_seafood',
-        'expires_on' => null,
-        'ready_on' => null,
-        'from_note' => 'bought 2 lbs chicken thighs',
-        ...$overrides,
-    ];
-}
-
-/**
- * One piece as EquipmentReader returns it.
- *
- * @param  array<string, mixed>  $overrides
- * @return array<string, mixed>
- */
-function readerPiece(array $overrides = []): array
-{
-    return [
-        'kind' => 'added',
-        'equipment_id' => null,
-        'name' => 'Potato ricer',
-        'category' => 'tools',
-        'brand' => null,
-        'size' => null,
-        'count' => 1,
-        'photos' => [1],
-        'from_note' => 'on the counter',
-        ...$overrides,
-    ];
-}
-
-/**
- * A recipe as RecipeReader returns it.
- *
- * @param  array<string, mixed>  $overrides
- * @return array<string, mixed>
- */
-function readerRecipe(array $overrides = []): array
+function sentRecipe(array $overrides = []): array
 {
     return [
         'name' => 'Corn tortillas',
@@ -92,7 +45,6 @@ function readerRecipe(array $overrides = []): array
         'equipment' => ['Tortilla press'],
         'steps' => ['Mix the masa, water and salt into a soft dough.', 'Press into rounds and cook on a hot skillet, about 1 minute a side.'],
         'notes' => null,
-        'not_understood' => [],
         ...$overrides,
     ];
 }

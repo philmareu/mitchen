@@ -1,11 +1,8 @@
 <?php
 
 use App\Actions\AddRecipe;
-use App\Ai\Agents\NameMatcher;
-use App\Ai\Agents\RecipeReader;
 use App\Enums\Course;
 use App\Enums\Diet;
-use App\Enums\IngredientCategory;
 use App\Enums\Protein;
 use App\Enums\Readiness;
 use App\Enums\StorageLocation;
@@ -23,17 +20,14 @@ use App\Models\ShoppingListItem;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
 use App\Support\VariantDraft;
-use Filament\Actions\Testing\TestAction;
 use Filament\Notifications\Notification;
 use Filament\Schemas\Components\Tabs\Tab;
 use Illuminate\Support\Facades\Storage;
-use Laravel\Ai\Prompts\AgentPrompt;
 
 use function Pest\Livewire\livewire;
 
 beforeEach(function () {
     actingAsCook();
-    config(['ai.providers.anthropic.key' => 'test-key']);
     Storage::fake();
 });
 
@@ -270,114 +264,6 @@ it('deletes a recipe with its photos', function () {
     Storage::assertMissing('recipes/card.jpg');
 });
 
-it('reads photos of a recipe card for the cook to check, then saves it with the photos', function () {
-    Ingredient::factory()->create(['name' => 'Kosher salt', 'category' => IngredientCategory::SpicesAndHerbs]);
-
-    RecipeReader::fake([readerRecipe(['not_understood' => ['a smudge by the salt']])]);
-
-    livewire(ListRecipes::class)
-        ->mountAction('quickAddRecipe')
-        ->fillForm(['photos' => [fakeReceiptPhoto('front.jpg'), fakeReceiptPhoto('back.jpg')]])
-        ->goToNextWizardStep()
-        ->assertHasNoFormErrors()
-        ->assertWizardCurrentStep(2)
-        ->assertSchemaStateSet([
-            'name' => 'Corn tortillas',
-            'servings' => 16,
-            'not_understood' => ['a smudge by the salt'],
-        ])
-        ->assertSchemaStateSet(fn (array $state): bool => count($state['ingredients']) === 3
-            && $state['ingredients'][0]['category'] === 'baking'
-            && count($state['steps']) === 2)
-        ->callMountedAction()
-        ->assertHasNoFormErrors()
-        ->assertNotified('Recipe saved')
-        ->assertRedirect(recipePageUrl(Recipe::sole()));
-
-    RecipeReader::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->attachments->count() === 2);
-
-    $recipe = Recipe::sole();
-
-    expect($recipe)
-        ->name->toBe('Corn tortillas')
-        ->source->toBe('Back of the masa bag')
-        ->steps->toHaveCount(2)
-        ->photos->toHaveCount(2)
-        ->and($recipe->ingredients->pluck('name')->all())->toBe(['Masa harina', 'Water', 'Kosher salt'])
-        ->and(Ingredient::query()->named('Masa harina')->sole()->category)->toBe(IngredientCategory::Baking)
-        ->and($recipe->equipment->sole()->name)->toBe('Tortilla press');
-
-    Storage::assertExists($recipe->photos);
-});
-
-it('reads a typed recipe, lets the cook correct it, then saves it', function () {
-    RecipeReader::fake([readerRecipe(['source' => null])]);
-
-    livewire(ListRecipes::class)
-        ->mountAction('quickAddRecipe')
-        ->fillForm(['note' => "Corn tortillas\n2 cups masa harina, 1½ cups warm water, ½ tsp salt"])
-        ->goToNextWizardStep()
-        ->assertWizardCurrentStep(2)
-        ->fillForm(function (array $state): array {
-            $state['servings'] = 12;
-            $state['ingredients'][1]['quantity'] = '1⅓ cups';
-
-            return $state;
-        })
-        ->callMountedAction()
-        ->assertHasNoFormErrors();
-
-    RecipeReader::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains('2 cups masa harina'));
-
-    expect(Recipe::sole())
-        ->servings->toBe(12)
-        ->cuisine->toBe('Mexican')
-        ->course->toBe(Course::Bread)
-        ->diets->toBe(['vegan', 'gluten_free'])
-        ->photos->toBe([])
-        ->and(Recipe::sole()->ingredients[1]->quantity)->toBe('1⅓ cups');
-});
-
-it('stays on the first step when the assistant finds no recipe', function () {
-    RecipeReader::fake([readerRecipe(['name' => '', 'ingredients' => [], 'steps' => []])]);
-
-    livewire(ListRecipes::class)
-        ->mountAction('quickAddRecipe')
-        ->fillForm(['note' => 'milk, eggs, bread'])
-        ->goToNextWizardStep()
-        ->assertWizardCurrentStep(1)
-        ->assertNotified('No recipe found');
-
-    expect(Recipe::count())->toBe(0);
-});
-
-it('stays on the first step when the assistant cannot be reached', function () {
-    RecipeReader::fake(fn () => throw new RuntimeException('Connection refused'));
-
-    livewire(ListRecipes::class)
-        ->mountAction('quickAddRecipe')
-        ->fillForm(['note' => 'tortillas'])
-        ->goToNextWizardStep()
-        ->assertWizardCurrentStep(1)
-        ->assertNotified('The assistant couldn\'t read that right now');
-});
-
-it('needs a note or a photo', function () {
-    livewire(ListRecipes::class)
-        ->mountAction('quickAddRecipe')
-        ->goToNextWizardStep()
-        ->assertHasFormErrors(['note' => 'required_without'])
-        ->assertWizardCurrentStep(1);
-
-    RecipeReader::assertNeverPrompted();
-});
-
-it('needs an API key', function () {
-    config(['ai.providers.anthropic.key' => null]);
-
-    livewire(ListRecipes::class)->assertActionDisabled('quickAddRecipe');
-});
-
 it('adds a substitute by hand and shows it under the ingredient', function () {
     InventoryItem::factory()->for(Ingredient::factory()->create(['name' => 'Milk']))->create(['quantity' => 'half a gallon']);
     InventoryItem::factory()->for(Ingredient::factory()->create(['name' => 'Lemon juice']))->create(['quantity' => 'plenty']);
@@ -431,26 +317,6 @@ it('only offers the recipe\'s ingredients to substitute', function () {
     expect(Recipe::count())->toBe(0);
 });
 
-it('reads substitutes into the review step and saves them', function () {
-    RecipeReader::fake([readerRecipe([
-        'name' => 'Buttermilk pancakes',
-        'ingredients' => [['quantity' => '1 cup', 'name' => 'Buttermilk', 'note' => null, 'optional' => false, 'category' => 'dairy_and_eggs']],
-        'substitutes' => [['instead_of' => 'Buttermilk', 'use' => [['quantity' => '1 cup', 'name' => 'Milk', 'category' => 'dairy_and_eggs'], ['quantity' => '1 tbsp', 'name' => 'Lemon juice', 'category' => 'produce']], 'note' => null]],
-    ])]);
-
-    livewire(ListRecipes::class)
-        ->mountAction('quickAddRecipe')
-        ->fillForm(['note' => 'Buttermilk pancakes, or use milk with lemon juice'])
-        ->goToNextWizardStep()
-        ->assertWizardCurrentStep(2)
-        ->assertSchemaStateSet(fn (array $state): bool => array_values($state['substitutes'])[0]['instead_of'] === 'Buttermilk')
-        ->callMountedAction()
-        ->assertHasNoFormErrors();
-
-    expect(Recipe::sole()->substitutes->sole()->describe())->toBe('1 cup Milk + 1 tbsp Lemon juice')
-        ->and(Ingredient::query()->named('Lemon juice')->sole()->category)->toBe(IngredientCategory::Produce);
-});
-
 it('adds a variant by hand, shows it on the recipe page and logs which one was made', function () {
     // Another recipe's variant first, so this one's id isn't the option's position.
     Recipe::factory()->create()->variants()->create(['name' => 'Blueberry']);
@@ -490,51 +356,4 @@ it('adds a variant by hand, shows it on the recipe page and logs which one was m
         ->assertHasNoFormErrors();
 
     expect($recipe->cookLogs()->sole()->madeAs())->toBe('Version 1, Hot');
-});
-
-it('suggests the catalog ingredient a new name may mean, and swaps it in when the cook picks it', function () {
-    config(['ai.providers.anthropic.key' => 'test-key']);
-    $greenOnions = Ingredient::factory()->create(['name' => 'Green onions']);
-    RecipeReader::fake([readerRecipe(['ingredients' => [
-        ['quantity' => '2', 'name' => 'Scallions', 'note' => 'sliced', 'optional' => false, 'category' => 'produce'],
-        ['quantity' => '1 tsp', 'name' => 'Sesame oil', 'note' => null, 'optional' => false, 'category' => 'oils_and_condiments'],
-    ]])]);
-    NameMatcher::fake([['matches' => [['name' => 'Scallions', 'catalog_name' => 'Green onions'], ['name' => 'Sesame oil', 'catalog_name' => null]]]]);
-
-    livewire(ListRecipes::class)
-        ->mountAction('quickAddRecipe')
-        ->fillForm(['note' => 'Scallion pancakes'])
-        ->goToNextWizardStep()
-        ->assertSchemaStateSet(fn (array $state): bool => $state['ingredients'][0]['suggestion'] === 'Green onions'
-            && $state['ingredients'][1]['suggestion'] === null)
-        ->callAction(TestAction::make('useSuggestion')->schemaComponent('ingredients.0.name'))
-        ->assertSchemaStateSet(fn (array $state): bool => $state['ingredients'][0]['name'] === 'Green onions')
-        ->callMountedAction()
-        ->assertHasNoFormErrors();
-
-    expect(Recipe::sole()->ingredients->pluck('ingredient_id')->first())->toBe($greenOnions->id)
-        ->and(Ingredient::query()->pluck('name')->all())->toEqualCanonicalizing(['Green onions', 'Sesame oil']);
-});
-
-it('suggests the piece of equipment a recipe\'s name for it may mean, and swaps it in when the cook picks it', function () {
-    config(['ai.providers.anthropic.key' => 'test-key']);
-    $vitamix = Equipment::factory()->create(['name' => 'Vitamix']);
-    RecipeReader::fake([readerRecipe(['equipment' => ['Blender', 'Tortilla press']])]);
-    // The catalog is empty, so the only question is about the equipment.
-    NameMatcher::fake([['matches' => [['name' => 'Blender', 'catalog_name' => 'vitamix'], ['name' => 'Tortilla press', 'catalog_name' => null]]]]);
-
-    livewire(ListRecipes::class)
-        ->mountAction('quickAddRecipe')
-        ->fillForm(['note' => 'Smoothie'])
-        ->goToNextWizardStep()
-        ->assertSchemaStateSet(fn (array $state): bool => $state['equipment'][0]['suggestion'] === 'Vitamix'
-            && $state['equipment'][1]['suggestion'] === null)
-        ->callAction(TestAction::make('useSuggestion')->schemaComponent('equipment.0.name'))
-        ->assertSchemaStateSet(fn (array $state): bool => $state['equipment'][0]['name'] === 'Vitamix')
-        ->callMountedAction()
-        ->assertHasNoFormErrors();
-
-    NameMatcher::assertPrompted(fn (AgentPrompt $prompt): bool => $prompt->contains("- Blender\n- Tortilla press\n\nThe kitchen's equipment: Vitamix"));
-
-    expect(Recipe::sole()->equipment->pluck('equipment_id')->all())->toBe([$vitamix->id, null]);
 });

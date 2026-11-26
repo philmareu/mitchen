@@ -8,6 +8,7 @@ use App\Enums\StorageLocation;
 use App\Filament\Resources\InventoryItems\InventoryItemResource;
 use App\Models\Ingredient;
 use App\Models\ShoppingListItem;
+use App\Models\Store;
 use App\Support\ProposedChange;
 use App\Support\PurchaseDetails;
 use Filament\Actions\Action;
@@ -18,6 +19,7 @@ use Filament\Forms\Components\Repeater\TableColumn;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
+use Filament\Schemas\Components\Fieldset;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Enums\Width;
 use Filament\Support\Icons\Heroicon;
@@ -61,7 +63,7 @@ class PutAwayAction extends Action
             })
             ->schema([
                 Hidden::make('entries'),
-                QuickUpdateAction::purchaseFieldset(),
+                $this->purchaseFieldset(),
                 Repeater::make('changes')
                     ->hiddenLabel()
                     ->table([
@@ -115,6 +117,33 @@ class PutAwayAction extends Action
                     ->success()
                     ->send();
             });
+    }
+
+    /**
+     * Where, when and for how much the shop was, for the purchase history.
+     */
+    private function purchaseFieldset(): Fieldset
+    {
+        return Fieldset::make('Purchase')
+            ->statePath('purchase')
+            ->columns(3)
+            ->schema([
+                TextInput::make('store')
+                    ->placeholder('Where you shopped')
+                    ->maxLength(255)
+                    ->datalist(fn (): array => Store::query()->orderBy('name')->pluck('name')->all()),
+                DatePicker::make('purchased_on')
+                    ->label('Bought on')
+                    ->default(today())
+                    ->maxDate(today())
+                    ->required(),
+                TextInput::make('total')
+                    ->label('Total paid')
+                    ->numeric()
+                    ->minValue(0)
+                    ->prefix('$')
+                    ->placeholder('Adds up the prices'),
+            ]);
     }
 
     /**

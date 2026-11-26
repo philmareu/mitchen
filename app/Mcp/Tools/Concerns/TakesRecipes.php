@@ -2,21 +2,19 @@
 
 namespace App\Mcp\Tools\Concerns;
 
-use App\Actions\ReadRecipe;
+use App\Actions\PrepareRecipeDraft;
 use App\Enums\Course;
 use App\Enums\Diet;
 use App\Enums\IngredientCategory;
 use App\Enums\Protein;
-use App\Models\Equipment;
-use App\Models\Ingredient;
 use App\Support\RecipeDraft;
 use Illuminate\Contracts\JsonSchema\JsonSchema;
 use Illuminate\JsonSchema\Types\Type;
 use Illuminate\Validation\Rule;
 
 /**
- * A whole recipe as an assistant sends it (add-recipe, update-recipe): the RecipeReader's
- * shape, so ReadRecipe::tidy() checks it against the catalog like a recipe read from a card.
+ * A whole recipe as an assistant sends it (add-recipe, update-recipe), which PrepareRecipeDraft
+ * checks against the catalog and the kitchen's equipment.
  */
 trait TakesRecipes
 {
@@ -79,13 +77,9 @@ trait TakesRecipes
      * @param  array<string, mixed>  $validated
      * @param  list<string>  $equipmentBefore  Equipment the recipe already calls for, which isn't asked about again.
      */
-    protected function draft(array $validated, ReadRecipe $read, array $equipmentBefore = []): RecipeDraft|string
+    protected function draft(array $validated, PrepareRecipeDraft $prepare, array $equipmentBefore = []): RecipeDraft|string
     {
-        $draft = $read->tidy(
-            $validated,
-            Ingredient::query()->orderBy('name')->pluck('name'),
-            Equipment::query()->orderBy('name')->pluck('name'),
-        );
+        $draft = $prepare->handle($validated);
 
         return match (true) {
             $draft->isEmpty() => 'A recipe needs ingredients or steps. Nothing was saved.',
