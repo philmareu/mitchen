@@ -32,7 +32,7 @@ class ManageShoppingListItems extends ManageRecords
                     $names = $add->restockList();
 
                     Notification::make()
-                        ->title('Added '.collect($names)->join(', ', ' and '))
+                        ->title(e('Added '.collect($names)->join(', ', ' and ')))
                         ->success()
                         ->send();
                 }),

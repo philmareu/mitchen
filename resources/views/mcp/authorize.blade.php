@@ -134,13 +134,16 @@
 
         <h1>Connect {{ $client->name }}?</h1>
 
-        <p>{{ $client->name }} will be able to see and change your kitchen: what's on hand, the shopping list, your recipes and your equipment.</p>
+        {{-- An app picks its own name, so the address it sends the cook back to is what says who it is. --}}
+        @if ($redirectHost)
+            <p>An app calling itself <strong>{{ $client->name }}</strong> wants to connect, and will send you back to <strong>{{ $redirectHost }}</strong>.</p>
+        @endif
+
+        <p>It will be able to see and change your kitchen: what's on hand, the shopping list, your recipes and your equipment.</p>
+
+        <p class="muted">Connect only if you started this yourself, just now.</p>
 
         <p class="muted">Signed in as {{ $user->email }}</p>
-
-        @if ($redirectHost)
-            <p class="muted">You'll go back to {{ $redirectHost }}.</p>
-        @endif
 
         <div class="actions">
             <form method="POST" action="{{ route('passport.authorizations.deny') }}">

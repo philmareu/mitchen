@@ -1,0 +1,73 @@
+name: Bug report
+description: Something in Mitchen is broken or shows the wrong thing.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Issues are public.** Leave out anything from your `.env`, access tokens, your server's address, and logs you haven't read through and redacted.
+
+        Found a security problem? Don't file it here. [Report it privately](https://github.com/philmareu/mitchen/security/advisories/new) instead.
+
+        Bug reports are welcome. I maintain Mitchen alone in my spare time, so a report may sit for a while before I get to it. This form is for bugs in Mitchen itself: I can't help with hosting PHP, or with how Claude or another assistant chooses to use the tools.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did and what Mitchen showed. Add the error message if there was one. For a problem over MCP, name the tool (such as `update-kitchen`), what was sent to it and what came back.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The shortest path from a working Mitchen to the problem. Say so if it also happens with the demo kitchen.
+      placeholder: |
+        1. Go to ...
+        2. Click ...
+        3. See ...
+    validations:
+      required: true
+  - type: dropdown
+    id: where
+    attributes:
+      label: Where it happens
+      options:
+        - In the app (browser)
+        - Over MCP (Claude or another client)
+        - Both
+        - Installing or updating
+  - type: input
+    id: version
+    attributes:
+      label: Mitchen version
+      description: The commit you're running. `git rev-parse --short HEAD` prints it.
+      placeholder: a1b2c3d
+  - type: input
+    id: php
+    attributes:
+      label: PHP version
+      description: From `php -v`.
+      placeholder: 8.5.12
+  - type: dropdown
+    id: database
+    attributes:
+      label: Database
+      options:
+        - SQLite
+        - MySQL or MariaDB
+        - PostgreSQL
+  - type: input
+    id: hosting
+    attributes:
+      label: How it's hosted
+      placeholder: php artisan serve on my laptop, Laravel Forge with nginx, Docker, ...
+  - type: input
+    id: client
+    attributes:
+      label: MCP client, if it's involved
+      placeholder: Claude on iOS, claude.ai, Claude Code, ...

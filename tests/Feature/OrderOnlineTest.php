@@ -23,6 +23,7 @@ it('has no online shop without a web address that searches for milk', function (
     'no address' => [null],
     'an address with no search for milk' => ['https://shop.example.com/home'],
     'not a web address' => ['javascript:alert("milk")'],
+    'milk only in the site\'s name' => ['https://milk.example.com/search?q=eggs'],
 ]);
 
 it('lists the stores with an online shop', function () {

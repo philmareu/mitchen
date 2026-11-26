@@ -80,7 +80,7 @@ class WhatToCook extends TableWidget
                         $added = $add->fromRecipe($record, $shortfall->toBuy()->modelKeys(), variant: $shortfall->variant);
 
                         Notification::make()
-                            ->title('Added '.collect($added)->join(', ', ' and ').' to the shopping list')
+                            ->title(e('Added '.collect($added)->join(', ', ' and ').' to the shopping list'))
                             ->success()
                             ->send();
                     }),

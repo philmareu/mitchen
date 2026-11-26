@@ -98,7 +98,7 @@ it('lets the Claude app register, get the cook\'s approval and call tools with i
         ->assertOk()
         ->assertSee('Connect Claude?')
         ->assertSee('Signed in as cook@example.com')
-        ->assertSee('You\'ll go back to claude.ai.', escape: false);
+        ->assertSee('An app calling itself <strong>Claude</strong> wants to connect, and will send you back to <strong>claude.ai</strong>.', escape: false);
 
     $redirect = $this->post(route('passport.authorizations.approve'), [
         'state' => '',
@@ -110,18 +110,70 @@ it('lets the Claude app register, get the cook\'s approval and call tools with i
     expect($redirect)->toStartWith($callback)
         ->and($query['state'])->toBe('kitchen');
 
-    $token = $this->post('/oauth/token', [
+    $tokens = $this->post('/oauth/token', [
         'grant_type' => 'authorization_code',
         'client_id' => $clientId,
         'redirect_uri' => $callback,
         'code_verifier' => $verifier,
         'code' => $query['code'],
-    ])->assertOk()->json('access_token');
+    ])->assertOk()->json();
+
+    // Access lasts a day at a time.
+    expect($tokens['expires_in'])->toBeBetween(86_000, 86_400);
 
     $this->app['auth']->forgetGuards();
 
-    $this->withToken($token)
+    $this->withToken($tokens['access_token'])
         ->postJson(route('mcp'), listInventoryRequest())
         ->assertOk()
         ->assertJsonPath('result.structuredContent.ingredients.0.name', 'Jasmine rice');
+
+    // The client renews it with its refresh token, which is replaced each time.
+    $refresh = fn () => $this->post('/oauth/token', [
+        'grant_type' => 'refresh_token',
+        'client_id' => $clientId,
+        'refresh_token' => $tokens['refresh_token'],
+    ]);
+
+    $renewed = $refresh()->assertOk()->json();
+
+    expect($renewed['access_token'])->not->toBe($tokens['access_token'])
+        ->and($renewed['refresh_token'])->not->toBe($tokens['refresh_token']);
+
+    $refresh()->assertStatus(400)->assertJsonPath('error', 'invalid_grant');
+
+    $this->app['auth']->forgetGuards();
+
+    $this->withToken($renewed['access_token'])
+        ->postJson(route('mcp'), listInventoryRequest())
+        ->assertOk();
+});
+
+it('only lets a client register to send the cook back to Claude or to the cook\'s own machine', function (string $callback, bool $allowed) {
+    $response = $this->postJson('/oauth/register', ['client_name' => 'Claude', 'redirect_uris' => [$callback]]);
+
+    $allowed
+        ? $response->assertCreated()
+        : $response->assertStatus(400)->assertJsonPath('error', 'invalid_redirect_uri');
+
+    expect(Passport::client()->newQuery()->count())->toBe($allowed ? 1 : 0);
+})->with([
+    'the Claude apps' => ['https://claude.ai/api/mcp/auth_callback', true],
+    'Claude Code, on localhost' => ['http://localhost:3118/callback', true],
+    'Claude Code, on the loopback address' => ['http://127.0.0.1:51234/callback', true],
+    'another site' => ['https://anything.example/callback', false],
+    'a site named to look like Claude' => ['https://claude.ai.anything.example/callback', false],
+    'Claude without HTTPS' => ['http://claude.ai/api/mcp/auth_callback', false],
+]);
+
+it('lets another client register once its address is listed in MCP_REDIRECT_DOMAINS', function () {
+    config(['mcp.redirect_domains' => ['https://claude.ai', 'http://localhost', 'https://assistant.example']]);
+
+    $this->postJson('/oauth/register', ['client_name' => 'Another assistant', 'redirect_uris' => ['https://assistant.example/callback']])
+        ->assertCreated();
+});
+
+it('has no device sign-in pages', function () {
+    $this->get('/oauth/device')->assertNotFound();
+    $this->postJson('/oauth/device/code')->assertNotFound();
 });

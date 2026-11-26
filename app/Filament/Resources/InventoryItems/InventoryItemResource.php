@@ -282,7 +282,8 @@ class InventoryItemResource extends Resource
                 : 'It isn\'t a core ingredient, so it will be removed from your inventory.')
             ->modalSubmitActionLabel('Used up')
             ->action(function (InventoryItem $record, UseUpInventoryItem $useUp): void {
-                $name = $record->ingredient->name;
+                // Notifications render HTML, and a name can be anything an assistant copied from a web page.
+                $name = e($record->ingredient->name);
                 $kept = $useUp->handle($record);
 
                 Notification::make()

@@ -76,7 +76,7 @@ class RestockList extends TableWidget
                     ->visible(fn (): bool => Ingredient::query()->needsRestock()->notOnShoppingList()->exists())
                     ->action(function (AddToShoppingList $add): void {
                         Notification::make()
-                            ->title('Added '.collect($add->restockList())->join(', ', ' and ').' to the shopping list')
+                            ->title(e('Added '.collect($add->restockList())->join(', ', ' and ').' to the shopping list'))
                             ->success()
                             ->send();
                     }),
@@ -93,7 +93,7 @@ class RestockList extends TableWidget
                         $add->handle($record);
 
                         Notification::make()
-                            ->title("{$record->name} is on the shopping list")
+                            ->title(e("{$record->name} is on the shopping list"))
                             ->success()
                             ->send();
                     }),
@@ -120,7 +120,7 @@ class RestockList extends TableWidget
                         $record->shoppingListItems()->delete();
 
                         Notification::make()
-                            ->title("{$record->name} restocked")
+                            ->title(e("{$record->name} restocked"))
                             ->success()
                             ->send();
                     }),

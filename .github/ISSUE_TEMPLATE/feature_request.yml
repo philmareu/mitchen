@@ -1,0 +1,30 @@
+name: Feature request
+description: Something you'd like Mitchen to do. Please read the note at the top of the form first.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Mitchen is a personal project. I built it for my own kitchen, and I add what I need. You're welcome to file a request, but I may close it without action if it doesn't fit how I cook with Mitchen. That isn't a judgement on the idea.
+
+        If you need it soon, fork Mitchen. It's licensed under the AGPL, so a changed copy you run for other people has to make its source available to them.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The situation matters more than the solution. What are you doing in your kitchen when Mitchen gets in the way?
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: If you have a change in mind, describe it.
+  - type: dropdown
+    id: pull-request
+    attributes:
+      label: Would you send a pull request for this?
+      description: If so, wait for a reply here before you start, so you don't spend time on something I won't merge.
+      options:
+        - "Yes"
+        - "No"

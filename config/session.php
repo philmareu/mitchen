@@ -167,9 +167,13 @@ return [
     | to the server if the browser has a HTTPS connection. This will keep
     | the cookie from being sent to you when it can't be done securely.
     |
+    | Mitchen turns this on whenever APP_URL starts with https://. Otherwise it
+    | follows each request, which needs TRUSTED_PROXIES to be right when a
+    | reverse proxy handles HTTPS.
+    |
     */
 
-    'secure' => env('SESSION_SECURE_COOKIE'),
+    'secure' => env('SESSION_SECURE_COOKIE', str_starts_with((string) env('APP_URL'), 'https://') ?: null),
 
     /*
     |--------------------------------------------------------------------------

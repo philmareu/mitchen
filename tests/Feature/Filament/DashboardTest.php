@@ -69,6 +69,16 @@ it('puts restock items on the shopping list', function () {
     expect(ShoppingListItem::pluck('ingredient_id')->all())->toEqualCanonicalizing([$milk->id, $rice->id, $flour->id]);
 });
 
+it('shows a name with markup in it as text in its notifications', function () {
+    $ingredient = Ingredient::factory()->core()->create(['name' => 'Milk <a href="https://example.com">sign in</a>']);
+
+    livewire(RestockList::class)
+        ->callAction(TestAction::make('addToShoppingList')->table($ingredient))
+        ->assertNotified('Milk &lt;a href=&quot;https://example.com&quot;&gt;sign in&lt;/a&gt; is on the shopping list')
+        ->callAction(TestAction::make('restock')->table($ingredient), ['quantity' => '1 gallon', 'location' => StorageLocation::Fridge->value])
+        ->assertNotified('Milk &lt;a href=&quot;https://example.com&quot;&gt;sign in&lt;/a&gt; restocked');
+});
+
 it('says how much to buy to be back at the stock target and puts that on the shopping list', function () {
     $beans = Ingredient::factory()->core()->has(InventoryItem::factory()->quantity('2 lb'))->create(['name' => 'Pinto beans', 'restock_point' => '2 lb', 'stock_target' => '10 lb']);
 
