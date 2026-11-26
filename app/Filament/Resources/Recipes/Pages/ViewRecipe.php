@@ -242,7 +242,7 @@ class ViewRecipe extends ViewRecord
 
                 Notification::make()
                     ->title('Added to the shopping list')
-                    ->body(implode(', ', $added))
+                    ->body(e(implode(', ', $added)))
                     ->success()
                     ->send();
 

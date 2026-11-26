@@ -45,14 +45,16 @@ class Store extends Model
     /**
      * Where the online shop lists what it has for this: the search address with the last "milk"
      * in it swapped (a shop at milkmarket.com keeps its name). Null when the store has no
-     * online shop, or its address isn't a web address with the sample search in it.
+     * online shop, or its address isn't a web address with the sample search in it after the
+     * site's name: swapping part of the name would link to some other site.
      */
     public function searchUrl(string $item): ?string
     {
         $address = (string) $this->search_url;
         $at = mb_strripos($address, self::SEARCH_SAMPLE);
+        $afterSite = mb_strlen(Str::match('/^[a-z]+:\/\/[^\/?#]*/i', $address));
 
-        if ($at === false || ! Str::isUrl($address, ['http', 'https'])) {
+        if ($at === false || $at < $afterSite || ! Str::isUrl($address, ['http', 'https'])) {
             return null;
         }
 
