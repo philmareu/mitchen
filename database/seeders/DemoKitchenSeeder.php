@@ -17,25 +17,83 @@ use App\Models\Purchase;
 use App\Models\Recipe;
 use App\Models\ShoppingListItem;
 use App\Models\Store;
+use App\Models\User;
 use App\Support\RecipeDraft;
 use App\Support\RecipeLine;
 use App\Support\SubstituteDraft;
 use App\Support\VariantDraft;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 /**
- * A lived-in kitchen to click around: staples at every stock level, a few
- * one-off ingredients, some core items that need restocking (one by its own
- * restock point, two with a stock target that says how much to buy), a short
- * shopping list, a few past shops with prices, some
- * equipment (without photos), a few ingredients that take planning to get, and
+ * The demo: one login and a lived-in kitchen to click around.
+ *
+ *   php artisan migrate --seed    a new database
+ *   php artisan db:seed           a database that's already migrated
+ *
+ * Then sign in as test@example.com / password. That password is public, and anyone
+ * who signs in sees the whole kitchen and can approve an MCP client, so the demo only
+ * loads where nobody's real kitchen lives: it refuses to run in production, in a
+ * database that has any other login, and in a kitchen that already has something in
+ * it (the demo, loaded before, included). `php artisan migrate:fresh --seed` starts
+ * it over. A real install starts with `php artisan mitchen:install` instead.
+ *
+ * Every date counts from today, so the demo looks the same whenever it's loaded.
+ *
+ * The kitchen: staples at every stock level, a few one-off ingredients, some core
+ * items that need restocking (one by its own restock point, two with a stock target
+ * that says how much to buy), a short shopping list, a few past shops with prices,
+ * some equipment (without photos), a few ingredients that take planning to get, and
  * recipes at every stage from ready to cook to needing equipment: one with a
- * substitute and a variant, one with variants, and one with a cook log and a
- * second version.
+ * substitute and a variant, one with variants, and one with a cook log and a second
+ * version.
  */
 class DemoKitchenSeeder extends Seeder
 {
+    public const string EMAIL = 'test@example.com';
+
+    public const string PASSWORD = 'password';
+
     public function run(): void
+    {
+        $this->refuseWhereTheDemoDoesNotBelong();
+
+        DB::transaction(function (): void {
+            User::query()->firstOrCreate(['email' => self::EMAIL], [
+                'name' => 'Test User',
+                'password' => self::PASSWORD,
+            ]);
+
+            $this->kitchen();
+        });
+    }
+
+    /**
+     * The demo login's password is public: keep it away from anyone's real kitchen.
+     */
+    private function refuseWhereTheDemoDoesNotBelong(): void
+    {
+        if (app()->isProduction()) {
+            throw new RuntimeException(sprintf(
+                'The demo adds the login %s with a password anyone can look up, so it does not run in production. To set up a real install, run `php artisan mitchen:install`.',
+                self::EMAIL,
+            ));
+        }
+
+        if (User::query()->where('email', '!=', self::EMAIL)->exists()) {
+            throw new RuntimeException(sprintf(
+                'This database already has a real login, and the demo would add %s next to it with a password anyone can look up. The demo is for a database of its own: `php artisan migrate:fresh --seed` deletes everything here and loads it.',
+                self::EMAIL,
+            ));
+        }
+
+        if (Ingredient::query()->exists() || Recipe::query()->exists() || Equipment::query()->exists() || ShoppingListItem::query()->exists() || Store::query()->exists()) {
+            throw new RuntimeException('This kitchen already has something in it, and the demo only loads into an empty one. `php artisan migrate:fresh --seed` deletes everything here and loads the demo again.');
+        }
+    }
+
+    private function kitchen(): void
     {
         // [name, category, core?, location, quantity, expires in days]
         $kitchen = [
